@@ -15,7 +15,7 @@ written using the matlab tools (readLabels.m, writeLabels.m) provided within
 this devkit. All values (numerical or strings) are separated via spaces,
 each row corresponds to one object. The 15 columns represent:
 
-#Values    Name      Description
+Values    Name      Description
 ----------------------------------------------------------------------------
    1    type         Describes the type of object: 'Car', 'Van', 'Truck',
                      'Pedestrian', 'Person_sitting', 'Cyclist', 'Tram',
