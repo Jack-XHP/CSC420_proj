@@ -16,7 +16,7 @@ this devkit. All values (numerical or strings) are separated via spaces,
 each row corresponds to one object. The 15 columns represent:
 
 Values |   Name   |   Description|
-----------------------------------------------------------------------------
+-------|----------|----------------------------------------------------------
    1  |  type      |   Describes the type of object: 'Car', 'Van', 'Truck', 'Pedestrian', 'Person_sitting', 'Cyclist', 'Tram','Misc' or 'DontCare'
    1   | truncated  |  Float from 0 (non-truncated) to 1 (truncated), where truncated refers to the object leaving image boundaries
    1  |  occluded   |  Integer (0,1,2,3) indicating occlusion state:  0 = fully visible, 1 = partly occluded 2 = largely occluded, 3 = unknown
