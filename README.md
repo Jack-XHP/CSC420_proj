@@ -2,9 +2,9 @@
 
 - HHA source code : https://github.com/ZhangMenghe/rgbd-processor-python
 - PSMnet source code : https://github.com/JiaRenChang/PSMNet/
-    run command for PSMnet:
-        train model: python CNN_disparity
-        get CNN disparity: python CNN_disparity --load_model <model path> --datapath <left and right image path>
+    - run command for PSMnet:
+        - train model: python CNN_disparity
+        - get CNN disparity: python CNN_disparity --load_model <model path> --datapath <left and right image path>
 
 Obejct Data Format Description
 =======================
