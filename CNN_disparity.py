@@ -11,10 +11,13 @@ import torch.utils.data
 from torch.autograd import Variable
 import torch.nn.functional as F
 import numpy as np
+import matplotlib.pyplot as plt
 import time
 import math
 import KITTIloader2015 as ls
 import KITTILoader as DA
+import os
+
 
 class disparityregression(nn.Module):
     def __init__(self, maxdisp):
@@ -22,7 +25,7 @@ class disparityregression(nn.Module):
         self.disp = Variable(torch.Tensor(np.reshape(np.array(range(maxdisp)), [1, maxdisp, 1, 1])),
                              requires_grad=False)
         if args.cuda:
-            self.disp =self.disp.cude()
+            self.disp =self.disp.cuda()
 
     def forward(self, x):
         disp = self.disp.repeat(x.size()[0], 1, x.size()[2], x.size()[3])
@@ -243,23 +246,36 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='enables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
+parser.add_argument('--loadmodel', default=None,
+                    help='load model')
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
-all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(args.datapath)
+all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp, train_name, val_name = ls.dataloader(args.datapath, args.loadmodel)
 
-TrainImgLoader = torch.utils.data.DataLoader(
-    DA.myImageFloder(all_left_img, all_right_img, all_left_disp, True),
-    batch_size=2, shuffle=True, num_workers=8, drop_last=False)
+if args.loadmodel is not None:
+    ResultImgLoader = torch.utils.data.DataLoader(
+        DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False, val_name, load=True),
+    batch_size=1, shuffle=False, num_workers=8, drop_last=False)
+else:
+    TrainImgLoader = torch.utils.data.DataLoader(
+        DA.myImageFloder(all_left_img, all_right_img, all_left_disp, True, train_name),
+        batch_size=4, shuffle=True, num_workers=8, drop_last=False)
 
-TestImgLoader = torch.utils.data.DataLoader(
-    DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
-    batch_size=2, shuffle=False, num_workers=8, drop_last=False)
+    TestImgLoader = torch.utils.data.DataLoader(
+        DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False, val_name),
+        batch_size=4, shuffle=False, num_workers=8, drop_last=False)
+
 
 model = PSMNet(args.maxdisp)
+if args.loadmodel is not None:
+    state_dict = torch.load(args.loadmodel)
+    model.load_state_dict(state_dict['state_dict'])
+if args.cuda:
+    model = model.cuda()
 optimizer = optim.Adam(model.parameters(), lr=0.1, betas=(0.9, 0.999))
 
 
@@ -278,7 +294,6 @@ def train(imgL, imgR, disp_true):
 
     optimizer.zero_grad()
     output = model(imgL, imgR)
-    print('true')
     output = torch.squeeze(output, 1)
     loss = F.smooth_l1_loss(output[mask], disp_true[mask], size_average=True)
 
@@ -316,12 +331,31 @@ def test(imgL, imgR, disp_true):
     return 1 - (float(torch.sum(correct)) / float(len(index[0])))
 
 
+def result(imgL, imgR, disp_true, name):
+    model.eval()
+    imgL = Variable(torch.FloatTensor(imgL))
+    imgR = Variable(torch.FloatTensor(imgR))
+    if args.cuda:
+        imgL, imgR = imgL.cuda(), imgR.cuda()
+
+    with torch.no_grad():
+        output3 = model(imgL, imgR)
+
+    pred_disp = output3.data.cpu().numpy().astype(np.uint16)
+    plt.imsave(args.datapath+'CNN_depth/'+name[0], pred_disp[0], cmap='gray')
+    '''
+    fig, (ax1, ax2) = plt.subplots(2, 1)
+    plt.title(name[0])
+    ax1.matshow(pred_disp[0])
+    ax2.matshow(disp_true[0])
+    plt.show()
+    '''
+
 def adjust_learning_rate(optimizer, epoch):
     if epoch <= 200:
         lr = 0.001
     else:
         lr = 0.0001
-    print(lr)
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
@@ -337,7 +371,7 @@ def main():
         adjust_learning_rate(optimizer, epoch)
 
         ## training ##
-        for batch_idx, (imgL_crop, imgR_crop, disp_crop_L) in enumerate(TrainImgLoader):
+        for batch_idx, (imgL_crop, imgR_crop, disp_crop_L, name) in enumerate(TrainImgLoader):
             start_time = time.time()
 
             loss = train(imgL_crop, imgR_crop, disp_crop_L)
@@ -347,7 +381,7 @@ def main():
 
         ## Test ##
 
-        for batch_idx, (imgL, imgR, disp_L) in enumerate(TestImgLoader):
+        for batch_idx, (imgL, imgR, disp_L, name) in enumerate(TestImgLoader):
             test_loss = test(imgL, imgR, disp_L)
             print('Iter %d 3-px error in val = %.3f' % (batch_idx, test_loss * 100))
             total_test_loss += test_loss
@@ -373,4 +407,11 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    if args.loadmodel is not None:
+        directory = args.datapath+'CNN_depth/'
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        for batch_idx, (imgL, imgR, disp_L, name) in enumerate(ResultImgLoader):
+            result(imgL, imgR, disp_L, name)
+    else:
+        main()

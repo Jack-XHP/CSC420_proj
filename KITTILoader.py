@@ -45,7 +45,7 @@ def disparity_loader(path):
 
 
 class myImageFloder(data.Dataset):
-    def __init__(self, left, right, left_disparity, training, loader=default_loader, dploader=disparity_loader):
+    def __init__(self, left, right, left_disparity, training, name, load=False, loader=default_loader, dploader=disparity_loader):
 
         self.left = left
         self.right = right
@@ -53,15 +53,21 @@ class myImageFloder(data.Dataset):
         self.loader = loader
         self.dploader = dploader
         self.training = training
+        self.name = name
+        self.load = load
 
     def __getitem__(self, index):
         left = self.left[index]
         right = self.right[index]
-        disp_L = self.disp_L[index]
+
+        name = self.name[index]
 
         left_img = self.loader(left)
         right_img = self.loader(right)
-        dataL = self.dploader(disp_L)
+
+        if not self.load:
+            disp_L = self.disp_L[index]
+            dataL = self.dploader(disp_L)
 
         if self.training:
             w, h = left_img.size
@@ -73,29 +79,33 @@ class myImageFloder(data.Dataset):
             left_img = left_img.crop((x1, y1, x1 + tw, y1 + th))
             right_img = right_img.crop((x1, y1, x1 + tw, y1 + th))
 
-            dataL = np.ascontiguousarray(dataL, dtype=np.float32) / 256
-            dataL = dataL[y1:y1 + th, x1:x1 + tw]
-
+            if not self.load:
+                dataL = np.ascontiguousarray(dataL, dtype=np.float32) / 256
+                dataL = dataL[y1:y1 + th, x1:x1 + tw]
+            else:
+                dataL = 0
             processed = get_transform()
             left_img = processed(left_img)
             right_img = processed(right_img)
 
-            return left_img, right_img, dataL
+            return left_img, right_img, dataL, name
         else:
             w, h = left_img.size
 
             left_img = left_img.crop((w - 1232, h - 368, w, h))
             right_img = right_img.crop((w - 1232, h - 368, w, h))
             w1, h1 = left_img.size
-
-            dataL = dataL.crop((w - 1232, h - 368, w, h))
-            dataL = np.ascontiguousarray(dataL, dtype=np.float32) / 256
+            if not self.load:
+                dataL = dataL.crop((w - 1232, h - 368, w, h))
+                dataL = np.ascontiguousarray(dataL, dtype=np.float32) / 256
+            else:
+                dataL = 0
 
             processed = get_transform()
             left_img = processed(left_img)
             right_img = processed(right_img)
 
-            return left_img, right_img, dataL
+            return left_img, right_img, dataL, name
 
     def __len__(self):
         return len(self.left)
