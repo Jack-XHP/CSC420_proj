@@ -52,3 +52,5 @@ calib_cam_to_cam.txt: Camera-to-camera calibration
   - S_rect_xx: 1x2 size of image xx after rectification
   - R_rect_xx: 3x3 rectifying rotation to make image planes co-planar
   - P_rect_xx: 3x4 projection matrix after rectification
+
+
