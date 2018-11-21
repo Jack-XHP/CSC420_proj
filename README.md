@@ -13,7 +13,7 @@ Require packages:
 
 current scripts:
 ==========
-- get CNN disparity: python CNN_disparity --load_model finetune_300 --datapath object_data/data_object_image_2/training
+- get CNN disparity: python CNN_disparity.py --loadmodel finetune_300.tar --datapath obejct_data/data_object_image_2/training/
 - get FRCNN 2d boxes: python Get_2D_Box.py
 - get Point Net prepared data: python Compute_3D_point.py
 - HHA source code : https://github.com/ZhangMenghe/rgbd-processor-python
