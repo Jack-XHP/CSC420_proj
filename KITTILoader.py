@@ -43,9 +43,6 @@ def default_loader(path):
 def disparity_loader(path):
     return Image.open(path)
 
-def label_loader(path):
-
-
 
 class myImageFloder(data.Dataset):
     def __init__(self, left, right, left_disparity, training, name, load=False, loader=default_loader, dploader=disparity_loader):

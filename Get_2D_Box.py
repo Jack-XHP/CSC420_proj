@@ -108,11 +108,8 @@ def run_inference_for_single_image(image, graph):
 
 
 box_dir = 'obejct_data/data_object_image_2/training/box/'
-score_dir = 'obejct_data/data_object_image_2/training/score/'
 if not os.path.exists(box_dir):
     os.makedirs(box_dir)
-if not os.path.exists(score_dir):
-    os.makedirs(score_dir)
 for image_path in TEST_IMAGE_PATHS:
     index = image_path.split('/')[-1].split('.')[0]
     image = Image.open(image_path)
@@ -131,6 +128,5 @@ for image_path in TEST_IMAGE_PATHS:
     output_dict['detection_scores'] = np.extract(class_mask, output_dict['detection_scores'])
 
     np.savetxt(box_dir + '{}.txt'.format(index),output_dict['detection_boxes'])
-    np.savetxt(score_dir+'{}.txt'.format(index),output_dict['detection_scores'])
     print(image_path)
     print(output_dict['detection_classes'])

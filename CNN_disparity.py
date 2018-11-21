@@ -11,7 +11,7 @@ import torch.utils.data
 from torch.autograd import Variable
 import torch.nn.functional as F
 import numpy as np
-import matplotlib.pyplot as plt
+import cv2 as cv
 import time
 import math
 import KITTIloader2015 as ls
@@ -296,14 +296,8 @@ def result(imgL, imgR, disp_true, name):
         output3 = model(imgL, imgR)
 
     pred_disp = output3.data.cpu().numpy().astype(np.uint16)
-    plt.imsave(args.datapath+'CNN_depth/'+name[0], pred_disp[0], cmap='gray')
-    '''
-    fig, (ax1, ax2) = plt.subplots(2, 1)
-    plt.title(name[0])
-    ax1.matshow(pred_disp[0])
-    ax2.matshow(disp_true[0])
-    plt.show()
-    '''
+    print(args.datapath+'CNN_depth/'+name[0])
+    cv.imwrite(args.datapath+'CNN_depth/'+name[0], pred_disp[0])
 
 def adjust_learning_rate(optimizer, epoch):
     if epoch <= 200:
@@ -401,7 +395,10 @@ if __name__ == '__main__':
 
     model = PSMNet(args.maxdisp)
     if args.loadmodel is not None:
-        state_dict = torch.load(args.loadmodel)
+        if args.cuda:
+            state_dict = torch.load(args.loadmodel)
+        else:
+            state_dict = torch.load(args.loadmodel, map_location='cpu')
         model.load_state_dict(state_dict['state_dict'])
     if args.cuda:
         model = model.cuda()
