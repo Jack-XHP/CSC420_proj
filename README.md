@@ -58,4 +58,9 @@ calib_cam_to_cam.txt: Camera-to-camera calibration
   - R_rect_xx: 3x3 rectifying rotation to make image planes co-planar
   - P_rect_xx: 3x4 projection matrix after rectification
 
+calib data we use:
+  - f = 721.537700
+  - px = 609.559300
+  - py = 172.854000
+  - T = 0.5327119288
 
