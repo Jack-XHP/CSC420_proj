@@ -7,9 +7,10 @@ current scripts:
 - HHA source code : https://github.com/ZhangMenghe/rgbd-processor-python
 - PSMnet source code : https://github.com/JiaRenChang/PSMNet/
     - run command for PSMnet:
-        - train model: python CNN_disparity
-        - get CNN disparity: python CNN_disparity --load_model <model path> --datapath <left and right image path>
-
+    - train model: python CNN_disparity
+    - get CNN disparity: python CNN_disparity --load_model <model path> --datapath <left and right image path>
+- Point Net source code : https://github.com/charlesq34/frustum-pointnets/blob/master/kitti/prepare_data.py
+- 3D Object proposal paper : https://arxiv.org/pdf/1608.07711.pdf
 Obejct Data Format Description
 =======================
 
