@@ -1,5 +1,9 @@
 # CSC420_proj
 
+current scripts:
+- get CNN disparity: python CNN_disparity --load_model finetune_300 --datapath object_data/data_object_image_2/training
+- get FRCNN 2d boxes: python tutrial.py
+- get Point Net prepared data: python Compute_3D_point.py
 - HHA source code : https://github.com/ZhangMenghe/rgbd-processor-python
 - PSMnet source code : https://github.com/JiaRenChang/PSMNet/
     - run command for PSMnet:

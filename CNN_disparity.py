@@ -233,52 +233,6 @@ class PSMNet(nn.Module):
         return pred
 
 
-parser = argparse.ArgumentParser(description='CNN_disp')
-parser.add_argument('--maxdisp', type=int, default=192,
-                    help='maxium disparity')
-parser.add_argument('--datapath', default='depth_data/data/training/',
-                    help='datapath')
-parser.add_argument('--epochs', type=int, default=300,
-                    help='number of epochs to train')
-parser.add_argument('--savemodel', default='./',
-                    help='save model')
-parser.add_argument('--no-cuda', action='store_true', default=False,
-                    help='enables CUDA training')
-parser.add_argument('--seed', type=int, default=1, metavar='S',
-                    help='random seed (default: 1)')
-parser.add_argument('--loadmodel', default=None,
-                    help='load model')
-args = parser.parse_args()
-args.cuda = not args.no_cuda and torch.cuda.is_available()
-torch.manual_seed(args.seed)
-if args.cuda:
-    torch.cuda.manual_seed(args.seed)
-
-all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp, train_name, val_name = ls.dataloader(args.datapath, args.loadmodel)
-
-if args.loadmodel is not None:
-    ResultImgLoader = torch.utils.data.DataLoader(
-        DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False, val_name, load=True),
-    batch_size=1, shuffle=False, num_workers=8, drop_last=False)
-else:
-    TrainImgLoader = torch.utils.data.DataLoader(
-        DA.myImageFloder(all_left_img, all_right_img, all_left_disp, True, train_name),
-        batch_size=4, shuffle=True, num_workers=8, drop_last=False)
-
-    TestImgLoader = torch.utils.data.DataLoader(
-        DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False, val_name),
-        batch_size=4, shuffle=False, num_workers=8, drop_last=False)
-
-
-model = PSMNet(args.maxdisp)
-if args.loadmodel is not None:
-    state_dict = torch.load(args.loadmodel)
-    model.load_state_dict(state_dict['state_dict'])
-if args.cuda:
-    model = model.cuda()
-optimizer = optim.Adam(model.parameters(), lr=0.1, betas=(0.9, 0.999))
-
-
 def train(imgL, imgR, disp_true):
     model.train()
     imgL = Variable(torch.FloatTensor(imgL))
@@ -407,6 +361,52 @@ def main():
 
 
 if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='CNN_disp')
+    parser.add_argument('--maxdisp', type=int, default=192,
+                        help='maxium disparity')
+    parser.add_argument('--datapath', default='depth_data/data/training/',
+                        help='datapath')
+    parser.add_argument('--epochs', type=int, default=300,
+                        help='number of epochs to train')
+    parser.add_argument('--savemodel', default='./',
+                        help='save model')
+    parser.add_argument('--no-cuda', action='store_true', default=False,
+                        help='enables CUDA training')
+    parser.add_argument('--seed', type=int, default=1, metavar='S',
+                        help='random seed (default: 1)')
+    parser.add_argument('--loadmodel', default=None,
+                        help='load model')
+    args = parser.parse_args()
+    args.cuda = not args.no_cuda and torch.cuda.is_available()
+    torch.manual_seed(args.seed)
+    if args.cuda:
+        torch.cuda.manual_seed(args.seed)
+
+    all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp, train_name, val_name = ls.dataloader(
+        args.datapath, args.loadmodel)
+
+    if args.loadmodel is not None:
+        ResultImgLoader = torch.utils.data.DataLoader(
+            DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False, val_name, load=True),
+            batch_size=1, shuffle=False, num_workers=8, drop_last=False)
+    else:
+        TrainImgLoader = torch.utils.data.DataLoader(
+            DA.myImageFloder(all_left_img, all_right_img, all_left_disp, True, train_name),
+            batch_size=4, shuffle=True, num_workers=8, drop_last=False)
+
+        TestImgLoader = torch.utils.data.DataLoader(
+            DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False, val_name),
+            batch_size=4, shuffle=False, num_workers=8, drop_last=False)
+
+    model = PSMNet(args.maxdisp)
+    if args.loadmodel is not None:
+        state_dict = torch.load(args.loadmodel)
+        model.load_state_dict(state_dict['state_dict'])
+    if args.cuda:
+        model = model.cuda()
+    optimizer = optim.Adam(model.parameters(), lr=0.1, betas=(0.9, 0.999))
+
     if args.loadmodel is not None:
         directory = args.datapath+'CNN_depth/'
         if not os.path.exists(directory):
