@@ -25,7 +25,7 @@ class disparityregression(nn.Module):
         self.disp = Variable(torch.Tensor(np.reshape(np.array(range(maxdisp)), [1, maxdisp, 1, 1])),
                              requires_grad=False)
         if args.cuda:
-            self.disp =self.disp.cuda()
+            self.disp = self.disp.cuda()
 
     def forward(self, x):
         disp = self.disp.repeat(x.size()[0], 1, x.size()[2], x.size()[3])
@@ -296,8 +296,9 @@ def result(imgL, imgR, disp_true, name):
         output3 = model(imgL, imgR)
 
     pred_disp = output3.data.cpu().numpy().astype(np.uint16)
-    print(args.datapath+'CNN_depth/'+name[0])
-    cv.imwrite(args.datapath+'CNN_depth/'+name[0], pred_disp[0])
+    print(args.datapath + 'CNN_depth/' + name[0])
+    cv.imwrite(args.datapath + 'CNN_depth/' + name[0], pred_disp[0])
+
 
 def adjust_learning_rate(optimizer, epoch):
     if epoch <= 200:
@@ -405,7 +406,7 @@ if __name__ == '__main__':
     optimizer = optim.Adam(model.parameters(), lr=0.1, betas=(0.9, 0.999))
 
     if args.loadmodel is not None:
-        directory = args.datapath+'CNN_depth/'
+        directory = args.datapath + 'CNN_depth/'
         if not os.path.exists(directory):
             os.makedirs(directory)
         for batch_idx, (imgL, imgR, disp_L, name) in enumerate(ResultImgLoader):

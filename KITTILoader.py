@@ -160,10 +160,10 @@ class myPointData(data.Dataset):
                torch.FloatTensor(seg_mask), \
                torch.FloatTensor(box3d_center), \
                torch.FloatTensor(box3d_center_rot), \
-               torch.FloatTensor([angle_c]), \
-               torch.FloatTensor([angle_r]), \
-               torch.FloatTensor([angle_c_rot]), \
-               torch.FloatTensor([angle_r_rot]), \
+               angle_c, \
+               angle_r, \
+               angle_c_rot, \
+               angle_r_rot, \
                torch.FloatTensor(size_r)
 
     def __len__(self):
@@ -241,10 +241,10 @@ class myImageFloder(data.Dataset):
 if __name__ == '__main__':
     test_load = torch.utils.data.DataLoader(
         myPointData('obejct_data/data_object_image_2/training/frustum_points_train/', 1024, 12),
-        batch_size=1, shuffle=False, num_workers=8, drop_last=False)
+        batch_size=10, shuffle=False, num_workers=8, drop_last=False)
     for batch_idx, (
-    points, points_rot, seg_mask, box3d_center, box3d_center_rot, angle_c, angle_r, angle_c_rot, angle_r_rot,
-    size_r) in enumerate(test_load):
+            points, points_rot, seg_mask, box3d_center, box3d_center_rot, angle_c, angle_r, angle_c_rot, angle_r_rot,
+            size_r) in enumerate(test_load):
         print("batch:{}".format(batch_idx))
         print(points.shape)
         print(points_rot)

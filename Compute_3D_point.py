@@ -4,6 +4,7 @@ import cv2 as cv
 from KITTIloader2015 import read_label, Object3d, read_2d_box
 from scipy.spatial import Delaunay
 
+
 class Voxel():
     def __init__(self, size):
         self.voxels = None
@@ -173,18 +174,19 @@ if __name__ == '__main__':
         os.makedirs(point_train)
     if not os.path.exists(point_val):
         os.makedirs(point_val)
-    index = 0
+    train_index = 0
+    val_index = 0
     box3d_count = []
     for img in os.listdir(dir):
         points = find_3d_point(dir + img)
         img_id = img.split('.')[0]
         print(img_id)
-        if int(img_id) == 700:
-            index = 0
         if int(img_id) < 700:
-            index, box_count = extract_frustum(points, img_id, index, point_train, perturb_box2d=True, augmentX=5)
+            train_index, box_count = extract_frustum(points, img_id, train_index, point_train, perturb_box2d=True,
+                                                     augmentX=5)
             box3d_count = box3d_count + box_count
         else:
-            index, box_count = extract_frustum(points, img_id, index, point_val, perturb_box2d=False, augmentX=1)
+            val_index, box_count = extract_frustum(points, img_id, val_index, point_val, perturb_box2d=False,
+                                                   augmentX=1)
             box3d_count = box3d_count + box_count
     np.savetxt('avg_box_size', np.mean(np.array(box3d_count), axis=0))
