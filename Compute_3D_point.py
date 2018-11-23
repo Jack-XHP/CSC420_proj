@@ -2,7 +2,7 @@ import numpy as np
 import os
 import cv2 as cv
 from KITTIloader2015 import read_label, Object3d, read_2d_box
-
+from scipy.spatial import Delaunay
 
 class Voxel():
     def __init__(self, size):
@@ -97,6 +97,18 @@ def compute_box_3d(obj):
     return corners_3d.T
 
 
+def in_hull(p, hull):
+    if not isinstance(hull, Delaunay):
+        hull = Delaunay(hull)
+    return hull.find_simplex(p) >= 0
+
+
+def extract_pc_in_box3d(pc, box3d):
+    ''' pc: (N,3), box3d: (8,3) '''
+    box3d_roi_inds = in_hull(pc[:, 0:3], box3d)
+    return pc[box3d_roi_inds, :], box3d_roi_inds
+
+
 def extract_frustum(points, img_id, index, point_dir, perturb_box2d=False, augmentX=1):
     label_file = 'obejct_data/data_object_image_2/training/label_2/{}.txt'.format(img_id)
     if os.path.isfile(label_file):
@@ -112,6 +124,7 @@ def extract_frustum(points, img_id, index, point_dir, perturb_box2d=False, augme
         box2d = obj.box2d
         datas = {}
         box3d_count = []
+        box3d_size = None
         for i in range(augmentX):
             # Augment data by box2d perturbation
             if perturb_box2d:
@@ -129,13 +142,13 @@ def extract_frustum(points, img_id, index, point_dir, perturb_box2d=False, augme
             box2d_center = np.array([(xmin + xmax) / 2.0, (ymin + ymax) / 2.0]).astype(int)
             center = points[(box2d_center[1], box2d_center[0])]
             frustum_angle = -1 * np.arctan2(center[2], center[0])
-            label = np.zeros((points.shape[0], points.shape[1]))
-            label[ymin: ymax + 1, xmin: xmax + 1] = 1
-            label = label.flatten()
             if np.all(obj.t == 0):
                 obj.t = center
             box3d_corner = compute_box_3d(obj)
             box3d_size = np.array([obj.l, obj.w, obj.h])
+            _, inds = extract_pc_in_box3d(point_2d, box3d_corner)
+            label = np.zeros(point_2d.shape[0])
+            label[inds] = 1
             datas['img_id'] = img_id
             datas['point_2d'] = point_2d
             datas['box2d_corner'] = box2d_corner
@@ -147,7 +160,8 @@ def extract_frustum(points, img_id, index, point_dir, perturb_box2d=False, augme
             np.save(point_dir + str(index), datas)
             datas = {}
             index += 1
-        box3d_count.append(box3d_size)
+        if box3d_size is not None:
+            box3d_count.append(box3d_size)
     return index, box3d_count
 
 

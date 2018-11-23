@@ -409,6 +409,7 @@ if __name__ == '__main__':
         if not os.path.exists(directory):
             os.makedirs(directory)
         for batch_idx, (imgL, imgR, disp_L, name) in enumerate(ResultImgLoader):
+            print(imgL.size())
             result(imgL, imgR, disp_L, name)
     else:
         main()

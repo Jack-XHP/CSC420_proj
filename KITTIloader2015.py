@@ -53,7 +53,7 @@ def obeject_dataloader(filepath):
   disp = 'CNN_depth/'
   label = 'label_2/'
 
-  image = [img for img in os.listdir(filepath+left_fold)]
+  image = [img for img in os.listdir(filepath + left_fold)]
 
   train = image[:700]
   val   = image[700:]

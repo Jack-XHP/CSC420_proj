@@ -152,10 +152,19 @@ class myPointData(data.Dataset):
 
         # rotate points and boxes to center of frustum
         points_rot = rotate_pc_along_y(points.copy(), rot_angle)
-        box3d_center_rot = rotate_pc_along_y(np.expand_dims(box3d_center, 0), rot_angle).squeeze()
+        box3d_center_rot = rotate_pc_along_y(np.expand_dims(box3d_center.copy(), 0), rot_angle).squeeze()
         angle_c_rot, angle_r_rot = angle2class(head - rot_angle, self.num_angle)
 
-        return points, points_rot, box3d_center, box3d_center_rot, angle_c, angle_r, angle_c_rot, angle_r_rot, size_r
+        return torch.FloatTensor(points), \
+               torch.FloatTensor(points_rot), \
+               torch.FloatTensor(seg_mask), \
+               torch.FloatTensor(box3d_center), \
+               torch.FloatTensor(box3d_center_rot), \
+               torch.FloatTensor([angle_c]), \
+               torch.FloatTensor([angle_r]), \
+               torch.FloatTensor([angle_c_rot]), \
+               torch.FloatTensor([angle_r_rot]), \
+               torch.FloatTensor(size_r)
 
     def __len__(self):
         return len(self.points)
@@ -233,10 +242,11 @@ if __name__ == '__main__':
     test_load = torch.utils.data.DataLoader(
         myPointData('obejct_data/data_object_image_2/training/frustum_points_train/', 1024, 12),
         batch_size=1, shuffle=False, num_workers=8, drop_last=False)
-    for batch_idx, (points, points_rot, box3d_center, box3d_center_rot, angle_c, angle_r, angle_c_rot, angle_r_rot,
-                    size_r) in enumerate(test_load):
+    for batch_idx, (
+    points, points_rot, seg_mask, box3d_center, box3d_center_rot, angle_c, angle_r, angle_c_rot, angle_r_rot,
+    size_r) in enumerate(test_load):
         print("batch:{}".format(batch_idx))
-        print(points)
+        print(points.shape)
         print(points_rot)
         print(box3d_center)
         print(box3d_center_rot)
