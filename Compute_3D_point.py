@@ -110,7 +110,7 @@ def extract_pc_in_box3d(pc, box3d):
     return pc[box3d_roi_inds, :], box3d_roi_inds
 
 
-def extract_frustum(points, img_id, index, point_dir, perturb_box2d=False, augmentX=1):
+def extract_frustum(points, img_id, index, point_dir, num_points, perturb_box2d=False, augmentX=1):
     label_file = 'obejct_data/data_object_image_2/training/label_2/{}.txt'.format(img_id)
     if os.path.isfile(label_file):
         objects = read_label(label_file)
@@ -138,7 +138,12 @@ def extract_frustum(points, img_id, index, point_dir, perturb_box2d=False, augme
             xmax = min(image_x, xmax)
             ymin = max(0, ymin)
             ymax = min(image_y, ymax)
-            point_2d = points[ymin: ymax + 1, xmin: xmax + 1].reshape((-1, 3))
+            point_2d = points[ymin: ymax + 1, xmin: xmax + 1]
+            while point_2d.size / 3 > 2*num_points:
+                print(point_2d.shape)
+                point_2d = np.delete(point_2d, list(range(0, point_2d.shape[0], 8)), axis=0)
+                point_2d = np.delete(point_2d, list(range(0, point_2d.shape[1], 8)), axis=1)
+            point_2d = point_2d.reshape((-1, 3))
             box2d_corner = np.array([xmin, ymin, xmax, ymax])
             box2d_center = np.array([(xmin + xmax) / 2.0, (ymin + ymax) / 2.0]).astype(int)
             center = points[(box2d_center[1], box2d_center[0])]
@@ -148,6 +153,10 @@ def extract_frustum(points, img_id, index, point_dir, perturb_box2d=False, augme
             box3d_corner = compute_box_3d(obj)
             box3d_size = np.array([obj.l, obj.w, obj.h])
             _, inds = extract_pc_in_box3d(point_2d, box3d_corner)
+            print(inds.sum())
+            if inds.sum() < 10:
+                print("skip")
+                continue
             label = np.zeros(point_2d.shape[0])
             label[inds] = 1
             datas['img_id'] = img_id
@@ -166,6 +175,28 @@ def extract_frustum(points, img_id, index, point_dir, perturb_box2d=False, augme
     return index, box3d_count
 
 
+def sampleFromMask(distribution, points, num_points):
+    if distribution.sum() == 0:
+        print("Errors: mask cannot be 0, will random sample")
+        choice = np.random.choice(points.shape[0], num_points, replace=True)
+        samples = points[choice, :]
+        return samples
+    if distribution.sum() != 1:
+        distribution = distribution / distribution.sum()
+    rand = np.random.rand(num_points)
+    rand.sort()
+    samples = []
+    samplePos, distPos, cdf = 0, 0, distribution[0]
+    while samplePos < num_points:
+        if rand[samplePos] < cdf:
+            samplePos += 1
+            samples.append(points[distPos])
+        else:
+            distPos += 1
+            cdf += distribution[distPos]
+    return np.array(samples)
+
+
 if __name__ == '__main__':
     dir = 'obejct_data/data_object_image_2/training/CNN_depth/'
     point_train = 'obejct_data/data_object_image_2/training/frustum_points_train/'
@@ -182,11 +213,11 @@ if __name__ == '__main__':
         img_id = img.split('.')[0]
         print(img_id)
         if int(img_id) < 700:
-            train_index, box_count = extract_frustum(points, img_id, train_index, point_train, perturb_box2d=True,
-                                                     augmentX=5)
+            train_index, box_count = extract_frustum(points, img_id, train_index, point_train, 1024, perturb_box2d=True,
+                                                     augmentX=10)
             box3d_count = box3d_count + box_count
         else:
-            val_index, box_count = extract_frustum(points, img_id, val_index, point_val, perturb_box2d=False,
+            val_index, box_count = extract_frustum(points, img_id, val_index, point_val, 1024, perturb_box2d=False,
                                                    augmentX=1)
             box3d_count = box3d_count + box_count
     np.savetxt('avg_box_size', np.mean(np.array(box3d_count), axis=0))
