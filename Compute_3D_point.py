@@ -139,11 +139,18 @@ def extract_frustum(points, img_id, index, point_dir, num_points, perturb_box2d=
             ymin = max(0, ymin)
             ymax = min(image_y, ymax)
             point_2d = points[ymin: ymax + 1, xmin: xmax + 1]
-            while point_2d.size / 3 > 2*num_points:
+            while point_2d.size / 3 > num_points:
                 print(point_2d.shape)
                 point_2d = np.delete(point_2d, list(range(0, point_2d.shape[0], 8)), axis=0)
                 point_2d = np.delete(point_2d, list(range(0, point_2d.shape[1], 8)), axis=1)
             point_2d = point_2d.reshape((-1, 3))
+            center_points = points[int(3 / 4.0 * ymin + ymax/4.0): int(3 / 4.0 * ymax + ymin/4.0) + 1, int(3 / 4.0 * xmin + xmax/4.0): int(3 / 4.0 * xmax + xmin/4.0) + 1]
+            while center_points.size / 3 > num_points:
+                print(center_points.shape)
+                center_points = np.delete(center_points, list(range(0, center_points.shape[0], 8)), axis=0)
+                center_points = np.delete(center_points, list(range(0, center_points.shape[1], 8)), axis=1)
+            center_points = center_points.reshape((-1, 3))
+            point_2d = np.vstack((point_2d, center_points))
             box2d_corner = np.array([xmin, ymin, xmax, ymax])
             box2d_center = np.array([(xmin + xmax) / 2.0, (ymin + ymax) / 2.0]).astype(int)
             center = points[(box2d_center[1], box2d_center[0])]
@@ -154,7 +161,7 @@ def extract_frustum(points, img_id, index, point_dir, num_points, perturb_box2d=
             box3d_size = np.array([obj.l, obj.w, obj.h])
             _, inds = extract_pc_in_box3d(point_2d, box3d_corner)
             print(inds.sum())
-            if inds.sum() < 10:
+            if inds.sum() < 1:
                 print("skip")
                 continue
             label = np.zeros(point_2d.shape[0])
@@ -193,7 +200,11 @@ def sampleFromMask(distribution, points, num_points):
             samples.append(points[distPos])
         else:
             distPos += 1
-            cdf += distribution[distPos]
+            if distPos > distribution.shape[0] - 1:
+                cdf += 1
+                distPos = distribution.shape[0] - 1
+            else:
+                cdf += distribution[distPos]
     return np.array(samples)
 
 

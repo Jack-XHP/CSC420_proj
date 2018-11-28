@@ -125,6 +125,7 @@ def class2size(residual):
 class myPointData(data.Dataset):
     def __init__(self, points_dir, num_point, num_angle):
         self.points = [points_dir + point for point in os.listdir(points_dir)]
+        self.points = self.points
         self.num_point = num_point
         self.num_angle = num_angle
 
