@@ -158,7 +158,7 @@ class myPointData(data.Dataset):
 
         return torch.FloatTensor(points), \
                torch.FloatTensor(points_rot), \
-               torch.FloatTensor(seg_mask), \
+               torch.LongTensor(seg_mask), \
                torch.FloatTensor(box3d_center), \
                torch.FloatTensor(box3d_center_rot), \
                angle_c, \

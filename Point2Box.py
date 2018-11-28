@@ -10,7 +10,6 @@ import numpy as np
 import time
 import math
 import KITTILoader as DA
-from Compute_3D_point import sampleFromMask
 import os
 from scipy.spatial import ConvexHull
 
@@ -165,6 +164,36 @@ def adjust_learning_rate(optimizer):
         param_group['lr'] /= 2.0
 
 
+def mask_to_indices(mask, npoints):
+    indices = np.zeros((mask.shape[0], npoints, 2), dtype=np.int32)
+    for i in range(mask.shape[0]):
+        pos_indices = np.where(mask[i,:]>0.5)[0]
+        # skip cases when pos_indices is empty
+        if len(pos_indices) > 0:
+            if len(pos_indices) > npoints:
+                choice = np.random.choice(len(pos_indices),npoints, replace=False)
+            else:
+                choice = np.random.choice(len(pos_indices),npoints-len(pos_indices), replace=True)
+                choice = np.concatenate((np.arange(len(pos_indices)), choice))
+            np.random.shuffle(choice)
+            indices[i,:,1] = pos_indices[choice]
+        indices[i,:,0] = i
+    return indices
+
+
+def sampleFromMask(mask_class, points, num_points):
+    mask = (mask_class[:,:,0] < mask_class[:,:, 1]).type(torch.FloatTensor)
+    mask_count = torch.sum(mask, dim=1, keepdim=True).unsqueeze(2).repeat(1,1,3)
+    mask_center = torch.sum(mask.unsqueeze(2).repeat(1,1,3) * points, dim=1, keepdim=True)
+    mask_center  = mask_center / torch.max(mask_count, torch.ones(mask_count.size()))
+    centered_points = points - mask_center.repeat(1, points.size(1), 1)
+    indices = mask_to_indices(mask, num_points)
+    indices = torch.LongTensor(indices)
+    idx1, idx2 = indices.chunk(2, dim=2)
+    masked_point = centered_points[idx1, idx2, :].squeeze()
+    return masked_point, mask_center
+
+
 class Segment_net(nn.Module):
     def __init__(self, num_points):
         super(Segment_net, self).__init__()
@@ -203,7 +232,7 @@ class Segment_net(nn.Module):
             nn.ReLU(inplace=True),
             convbn(128, 128, 1, 1, 0, 1),
             nn.ReLU(inplace=True),
-            convbn(128, 1, 1, 1, 0, 1)
+            convbn(128, 2, 1, 1, 0, 1)
         )
 
     def forward(self, points):
@@ -215,7 +244,7 @@ class Segment_net(nn.Module):
         expand_global_feature = global_feature.unsqueeze(-1).unsqueeze(-1).expand(new_size)
         cat_features = torch.cat((feature, expand_global_feature), dim=1)
         seg_mask = self.segment_net(cat_features)
-        return seg_mask.squeeze(-1).squeeze(1)
+        return torch.transpose(seg_mask.squeeze(-1), 1, 2)
 
     def getLoss(self, input, target):
         return self.loss(input, target)
@@ -299,17 +328,9 @@ class Point_net(nn.Module):
     def forward(self, points):
         # get masking of the input points
         pred_seg = self.seg_model(points)
-
         # sample points using mask as a distribution
-        masked_points = []
-        for i in range(seg_mask.size(0)):
-            masked_points.append(sampleFromMask(pred_seg[i].detach().cpu().numpy(), points[i].cpu().numpy(), 512))
-        masked_points = np.array(masked_points)
-
         # shift sampled pointed to their center
-        masked_center = torch.FloatTensor(np.mean(masked_points, axis=1))
-        masked_points = torch.FloatTensor(
-            masked_points - np.repeat(np.expand_dims(masked_center, axis=1), self.mask_points, axis=1))
+        masked_points, masked_center = sampleFromMask(pred_seg, points, self.mask_points)
 
         if args.cuda:
             masked_center, masked_points = masked_center.cuda(), masked_points.cuda()
@@ -324,12 +345,11 @@ class Point_net(nn.Module):
         # get box size, center and heading prediction
         box_pred = self.box_model(masked_points)
 
-        return masked_center, pred_center_r, box_pred, pred_seg
+        return masked_center.squeeze(1), pred_center_r, box_pred, pred_seg
 
     def getLoss(self, masked_center, pred_center_r, box_pred, pred_seg, seg_mask, box_center, head_c, head_r, size_r,
                 box_weight=1.0, corner_weight=10.0, trace=False, reduction='elementwise_mean'):
         L1loss = nn.SmoothL1Loss(reduction=reduction)
-        BCloss = nn.BCEWithLogitsLoss(reduction=reduction)
         CEloss = nn.CrossEntropyLoss(reduction=reduction)
         target = torch.zeros(masked_center.size(0))
         target_corner = torch.zeros(masked_center.size(0), 8)
@@ -339,8 +359,7 @@ class Point_net(nn.Module):
             target, target_corner,head_c_onehot, self.box_mean = target.cuda(), target_corner.cuda(), head_c_onehot.cuda(),self.box_mean.cuda()
 
         head_c_onehot.scatter_(1, head_c.unsqueeze(-1), 1)
-
-        mask_loss = BCloss(pred_seg, seg_mask)
+        mask_loss = CEloss(torch.transpose(pred_seg, 1, 2), seg_mask)
 
         center_loss = L1loss(torch.norm(box_center- (pred_center_r + masked_center), dim=1), target)
 
@@ -426,7 +445,7 @@ if __name__ == "__main__":
                 angle_r_rot,
                 size_r) in enumerate(train_load):
             points_rot = Variable(torch.FloatTensor(points_rot))
-            seg_mask = Variable(torch.FloatTensor(seg_mask))
+            seg_mask = Variable(torch.LongTensor(seg_mask))
             box3d_center_rot = Variable(torch.FloatTensor(box3d_center_rot))
             angle_c_rot = Variable(torch.LongTensor(angle_c_rot.type(torch.LongTensor)))
             angle_r_rot = Variable(torch.FloatTensor(angle_r_rot.type(torch.FloatTensor)))
@@ -466,7 +485,7 @@ if __name__ == "__main__":
                 angle_r_rot,
                 size_r) in enumerate(valid_load):
             points_rot = Variable(torch.FloatTensor(points_rot))
-            seg_mask = Variable(torch.FloatTensor(seg_mask))
+            seg_mask = Variable(torch.LongTensor(seg_mask))
             box3d_center_rot = Variable(torch.FloatTensor(box3d_center_rot))
             angle_c_rot = Variable(torch.LongTensor(angle_c_rot.type(torch.LongTensor)))
             angle_r_rot = Variable(torch.FloatTensor(angle_r_rot.type(torch.FloatTensor)))

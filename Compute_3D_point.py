@@ -184,7 +184,7 @@ def extract_frustum(points, img_id, index, point_dir, num_points, perturb_box2d=
     return index, box3d_count
 
 
-def sampleFromMask(distribution, points, num_points):
+def sampleFromMask_2(distribution, points, num_points):
     if distribution.sum() == 0:
         print("Errors: mask cannot be 0, will random sample")
         choice = np.random.choice(points.shape[0], num_points, replace=True)
@@ -208,6 +208,9 @@ def sampleFromMask(distribution, points, num_points):
             else:
                 cdf += distribution[distPos]
     return np.array(samples)
+
+
+
 
 
 if __name__ == '__main__':
