@@ -143,7 +143,7 @@ class myPointData(data.Dataset):
 
         # get 3d box center
         box3d_corner = datas['box3d_corner']
-        box3d_center = (box3d_corner[0, :] + box3d_corner[6, :]) / 2.0
+        box3d_center = datas['box3d_center']
 
         # convert heading to 12 classes and residual
         head = datas['heading']

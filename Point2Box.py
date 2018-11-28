@@ -135,7 +135,7 @@ def get_box3d_corners(center, heading, size):
     z_vector = torch.FloatTensor(np.array([1, -1, -1, 1, 1, -1, -1, 1]) * 0.5)
 
     if args.cuda:
-        x_vector, y_vector, z_vector = x_vector.cuda, y_vector.cuda, z_vector.cuda
+        x_vector, y_vector, z_vector = x_vector.cuda(), y_vector.cuda(), z_vector.cuda()
 
     x_corners = torch.ger(l, x_vector)
     y_corners = torch.ger(h, y_vector)
@@ -147,7 +147,7 @@ def get_box3d_corners(center, heading, size):
     zeros = torch.zeros(heading.size(0))
 
     if args.cuda:
-        c, s, ones, zeros = c.cuda, s.cuda, ones.cuda, zeros.cuda
+        c, s, ones, zeros = c.cuda(), s.cuda(), ones.cuda(), zeros.cuda()
 
     row1 = torch.stack((c, zeros, s), dim=1)
     row2 = torch.stack((zeros, ones, zeros), dim=1)
@@ -158,6 +158,11 @@ def get_box3d_corners(center, heading, size):
     corners_3d += center.unsqueeze(-1).repeat(1, 1, 8)
     corners_3d = torch.transpose(corners_3d, 1, 2)
     return corners_3d
+
+
+def adjust_learning_rate(optimizer):
+    for param_group in optimizer.param_groups:
+        param_group['lr'] /= 2.0
 
 
 class Segment_net(nn.Module):
@@ -283,9 +288,6 @@ class Center_regression_net(nn.Module):
 class Point_net(nn.Module):
     def __init__(self, num_points, mask_points, head_class):
         super(Point_net, self).__init__()
-        self.L1loss = nn.SmoothL1Loss()
-        self.BCloss = nn.BCEWithLogitsLoss()
-        self.CEloss = nn.CrossEntropyLoss()
         self.head_class = head_class
         self.mask_points = mask_points
         self.box_mean = torch.FloatTensor(
@@ -310,7 +312,7 @@ class Point_net(nn.Module):
             masked_points - np.repeat(np.expand_dims(masked_center, axis=1), self.mask_points, axis=1))
 
         if args.cuda:
-            masked_center, masked_points = masked_center.cuda, masked_points.cuda
+            masked_center, masked_points = masked_center.cuda(), masked_points.cuda()
 
         # get a predict residual for box center
         pred_center_r = self.center_model(masked_points)
@@ -325,50 +327,58 @@ class Point_net(nn.Module):
         return masked_center, pred_center_r, box_pred, pred_seg
 
     def getLoss(self, masked_center, pred_center_r, box_pred, pred_seg, seg_mask, box_center, head_c, head_r, size_r,
-                box_weight=1.0, corner_weight=10.0, trace=False):
+                box_weight=1.0, corner_weight=10.0, trace=False, reduction='elementwise_mean'):
+        L1loss = nn.SmoothL1Loss(reduction=reduction)
+        BCloss = nn.BCEWithLogitsLoss(reduction=reduction)
+        CEloss = nn.CrossEntropyLoss(reduction=reduction)
         target = torch.zeros(masked_center.size(0))
         target_corner = torch.zeros(masked_center.size(0), 8)
         head_c_onehot = torch.zeros(head_c.size(0), self.head_class)
-        head_c_onehot.scatter_(1, head_c.unsqueeze(-1), 1)
 
         if args.cuda:
-            target, target_corner,head_c_onehot = target.cuda, target_corner.cuda, head_c_onehot.cuda
+            target, target_corner,head_c_onehot, self.box_mean = target.cuda(), target_corner.cuda(), head_c_onehot.cuda(),self.box_mean.cuda()
 
-        mask_loss = self.BCloss(pred_seg, seg_mask)
+        head_c_onehot.scatter_(1, head_c.unsqueeze(-1), 1)
 
-        center_loss = self.L1loss(torch.norm(pred_center_r + masked_center - box_center, dim=1), target)
+        mask_loss = BCloss(pred_seg, seg_mask)
 
-        box_center_loss = self.L1loss(torch.norm(box_pred[:, :3]+pred_center_r + masked_center - box_center, dim=1), target)
+        center_loss = L1loss(torch.norm(box_center- (pred_center_r + masked_center), dim=1), target)
 
-        head_class_loss = self.CEloss(box_pred[:, 3:self.head_class + 3], head_c)
+        box_center_loss = L1loss(torch.norm(box_center- (box_pred[:, :3]+pred_center_r + masked_center), dim=1), target)
 
-        head_residual_loss = self.L1loss(
+        head_class_loss = CEloss(box_pred[:, 3:self.head_class + 3], head_c)
+
+        head_residual_loss = L1loss(
             torch.sum(box_pred[:, self.head_class + 3:2 * self.head_class + 3] * head_c_onehot, dim=1),
             head_r / (np.pi / self.head_class))
 
-        size_residual_loss = self.L1loss(box_pred[:, 2 * self.head_class + 3:], size_r / self.box_mean)
+        size_residual_loss = L1loss(box_pred[:, 2 * self.head_class + 3:], size_r / self.box_mean)
 
-        pred_heading = head_c.type(torch.FloatTensor) * 2 * np.pi / self.head_class + torch.sum(
+        float_head_c = head_c.type(torch.FloatTensor)
+
+        if args.cuda:
+            float_head_c = float_head_c.cuda()
+
+        pred_heading = float_head_c * 2 * np.pi / self.head_class + torch.sum(
             box_pred[:, self.head_class + 3:2 * self.head_class + 3] * head_c_onehot, dim=1) * (np.pi / self.head_class)
         pred_size = box_pred[:, 2 * self.head_class + 3:] * self.box_mean + self.box_mean
-        pred_corner_3d = get_box3d_corners(box_pred[:, :3], pred_heading, pred_size)
+        pred_center = box_pred[:, :3]+pred_center_r + masked_center
+        pred_corner_3d = get_box3d_corners(pred_center, pred_heading, pred_size)
 
-        heading = head_c.type(torch.FloatTensor) * 2 * np.pi / self.head_class + head_r
+        heading = float_head_c * 2 * np.pi / self.head_class + head_r
         flip_heading = heading + np.pi
         size = self.box_mean + size_r
         corner_3d = get_box3d_corners(box_center, heading, size)
         corner_3d_flip = get_box3d_corners(box_center, flip_heading, size)
 
-        corner_dist = torch.min(torch.norm(pred_corner_3d - corner_3d, dim=-1), torch.norm(pred_corner_3d - corner_3d_flip, dim=-1))
-        corner_loss = self.L1loss(corner_dist, target_corner)
+        corner_dist = torch.min(torch.norm(corner_3d - pred_corner_3d, dim=-1), torch.norm(corner_3d_flip - pred_corner_3d, dim=-1))
+        corner_loss = L1loss(corner_dist, target_corner)
         if trace:
             print(
                 "  mask loss {}\n  center_loss {} \n  box_center_loss {} \n  head_class_loss {} \n  head_residual_loss {} \n  size_residual_loss {}\n  corner_loss {}".format(
                 mask_loss, center_loss, box_center_loss, head_class_loss, head_residual_loss, size_residual_loss, corner_loss))
 
-        return mask_loss + box_weight * (
-                center_loss + box_center_loss + head_class_loss + head_residual_loss * 20
-                + size_residual_loss * 20 + corner_weight * corner_loss), pred_corner_3d, corner_3d, corner_3d_flip
+        return mask_loss + box_weight * (center_loss + box_center_loss + head_class_loss + head_residual_loss * 20 + size_residual_loss * 20 + corner_weight * corner_loss), pred_corner_3d, corner_3d, corner_3d_flip
 
 
 if __name__ == "__main__":
@@ -391,18 +401,19 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     if args.cuda:
         torch.cuda.manual_seed(args.seed)
-
-    train_load = torch.utils.data.DataLoader(
-        DA.myPointData('obejct_data/data_object_image_2/training/frustum_points_train/', 1024, 12),
-        batch_size=20, shuffle=True, num_workers=8, drop_last=False)
-    valid_load = torch.utils.data.DataLoader(
-        DA.myPointData('obejct_data/data_object_image_2/training/frustum_points_val/', 1024, 12),
-        batch_size=1000, shuffle=False, num_workers=8, drop_last=False)
-
+    train_data = DA.myPointData('obejct_data/data_object_image_2/training/frustum_points_train/', 1024, 12)
+    val_data = DA.myPointData('obejct_data/data_object_image_2/training/frustum_points_val/', 1024, 12)
+    train_load = torch.utils.data.DataLoader(train_data, batch_size=32, shuffle=True, num_workers=8, drop_last=False)
+    valid_load = torch.utils.data.DataLoader(val_data,batch_size=100, shuffle=False, num_workers=8, drop_last=False)
     # train 1 epoch for 3d box net
     model = Point_net(1024, 512, 12)
-    optimizer = optim.Adam(model.parameters(), lr=0.01)
+    if args.cuda:
+        model = model.cuda()
+    optimizer = optim.Adam(model.parameters(), lr=0.002)
     for epoch in range(args.epochs):
+        if epoch % 20 == 0:
+            adjust_learning_rate(optimizer)
+        model.train()
         for batch_idx, (
                 points,
                 points_rot,
@@ -422,11 +433,11 @@ if __name__ == "__main__":
             size_r = Variable(torch.FloatTensor(size_r))
 
             if args.cuda:
-                points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r = points_rot.cuda, seg_mask.cuda, box3d_center_rot.cuda, angle_c_rot.cuda, angle_r_rot.cuda, size_r.cuda
+                points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r = points_rot.cuda(), seg_mask.cuda(), box3d_center_rot.cuda(), angle_c_rot.cuda(), angle_r_rot.cuda(), size_r.cuda()
 
             optimizer.zero_grad()
             masked_center, pred_center_r, box_pred, pred_seg = model(points_rot)
-            if batch_idx % 10 == 0:
+            if batch_idx % 50 == 0:
                 print("batch: {}".format(batch_idx))
                 loss, pred_corner_3d, corner_3d, corner_3d_flip = model.getLoss(masked_center, pred_center_r, box_pred,
                                                                             pred_seg, seg_mask, box3d_center_rot,
@@ -440,6 +451,9 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
 
+        model.eval()
+        total_loss = 0
+        IOU = []
         for batch_idx, (
                 points,
                 points_rot,
@@ -459,19 +473,30 @@ if __name__ == "__main__":
             size_r = Variable(torch.FloatTensor(size_r))
 
             if args.cuda:
-                points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r = points_rot.cuda, seg_mask.cuda, box3d_center_rot.cuda, angle_c_rot.cuda, angle_r_rot.cuda, size_r.cuda
+                points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r = points_rot.cuda(), seg_mask.cuda(), box3d_center_rot.cuda(), angle_c_rot.cuda(), angle_r_rot.cuda(), size_r.cuda()
             masked_center, pred_center_r, box_pred, pred_seg = model(points_rot)
             loss, pred_corner_3d, corner_3d, corner_3d_flip = model.getLoss(masked_center, pred_center_r, box_pred,
                                                                             pred_seg, seg_mask, box3d_center_rot,
                                                                             angle_c_rot,
-                                                                            angle_r_rot, size_r, 1, 10, True)
-
-            print("valid total loss {}".format(loss))
+                                                                            angle_r_rot, size_r, reduction='sum')
+            total_loss += loss.detach()
+            print("valid batch {} loss {}".format(batch_idx, loss/size_r.size(0)))
             pred_corner_3d, corner_3d, corner_3d_flip = pred_corner_3d.detach().cpu().numpy(), corner_3d.detach().cpu().numpy(), corner_3d_flip.detach().cpu().numpy()
-            IOU = []
+
             for i in range(corner_3d.shape[0]):
                 IOU.append(box3d_iou(pred_corner_3d[i], corner_3d[i])[0])
 
-            IOU = np.array(IOU)
-            print(np.mean(IOU))
-            print(IOU)
+        total_loss /= len(val_data)
+        print("total loss {}".format(total_loss))
+        IOU = np.array(IOU)
+        print(np.mean(IOU))
+        print(np.sum(IOU > 0.4))
+
+        savefilename = args.savemodel + 'PointNet' + str(epoch) + '.tar'
+        torch.save({
+            'epoch': epoch,
+            'state_dict': model.state_dict(),
+            'IOU': IOU,
+            'loss': total_loss.cpu()
+        }, savefilename)
+

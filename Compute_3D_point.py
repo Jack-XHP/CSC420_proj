@@ -158,6 +158,7 @@ def extract_frustum(points, img_id, index, point_dir, num_points, perturb_box2d=
             if np.all(obj.t == 0):
                 obj.t = center
             box3d_corner = compute_box_3d(obj)
+            box3d_center = obj.t
             box3d_size = np.array([obj.l, obj.w, obj.h])
             _, inds = extract_pc_in_box3d(point_2d, box3d_corner)
             print(inds.sum())
@@ -170,6 +171,7 @@ def extract_frustum(points, img_id, index, point_dir, num_points, perturb_box2d=
             datas['point_2d'] = point_2d
             datas['box2d_corner'] = box2d_corner
             datas['box3d_corner'] = box3d_corner
+            datas['box3d_center'] = box3d_center
             datas['box3d_size'] = box3d_size
             datas['frustum_angle'] = frustum_angle
             datas['heading'] = obj.ry
