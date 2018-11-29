@@ -130,7 +130,7 @@ def get_box3d_corners(center, heading, size):
     w = size[:, 1].flatten()
     h = size[:, 2].flatten()
     x_vector = torch.FloatTensor(np.array([1, 1, -1, -1, 1, 1, -1, -1]) * 0.5)
-    y_vector = torch.FloatTensor(np.array([1, 1, 1, 1, -1, -1, -1, -1]) * 0.5)
+    y_vector = torch.FloatTensor(np.array([1,1,1,1, -1, -1, -1, -1])* 0.5)
     z_vector = torch.FloatTensor(np.array([1, -1, -1, 1, 1, -1, -1, 1]) * 0.5)
 
     if args.cuda:
@@ -183,16 +183,42 @@ def mask_to_indices(mask, npoints):
 
 def sampleFromMask(mask_class, points, num_points):
     mask = (mask_class[:,:,0] < mask_class[:,:, 1]).type(torch.FloatTensor)
+    if args.cuda:
+        mask = mask.cuda()
     mask_count = torch.sum(mask, dim=1, keepdim=True).unsqueeze(2).repeat(1,1,3)
     mask_center = torch.sum(mask.unsqueeze(2).repeat(1,1,3) * points, dim=1, keepdim=True)
-    mask_center  = mask_center / torch.max(mask_count, torch.ones(mask_count.size()))
+    ones = torch.ones(mask_count.size())
+    if args.cuda:
+        ones = ones.cuda()
+    mask_center  = mask_center / torch.max(mask_count, ones)
     centered_points = points - mask_center.repeat(1, points.size(1), 1)
     indices = mask_to_indices(mask, num_points)
     indices = torch.LongTensor(indices)
+    if args.cuda:
+        indices = indices.cuda()
     idx1, idx2 = indices.chunk(2, dim=2)
     masked_point = centered_points[idx1, idx2, :].squeeze()
     return masked_point, mask_center
 
+
+def sampleFromMask1(mask_class, points, num_points):
+    mask = mask_class.type(torch.FloatTensor)
+    if args.cuda:
+        mask = mask.cuda()
+    mask_count = torch.sum(mask, dim=1, keepdim=True).unsqueeze(2).repeat(1,1,3)
+    mask_center = torch.sum(mask.unsqueeze(2).repeat(1,1,3) * points, dim=1, keepdim=True)
+    ones = torch.ones(mask_count.size())
+    if args.cuda:
+        ones = ones.cuda()
+    mask_center  = mask_center / torch.max(mask_count, ones)
+    centered_points = points - mask_center.repeat(1, points.size(1), 1)
+    indices = mask_to_indices(mask, num_points)
+    indices = torch.LongTensor(indices)
+    if args.cuda:
+        indices = indices.cuda()
+    idx1, idx2 = indices.chunk(2, dim=2)
+    masked_point = centered_points[idx1, idx2, :].squeeze()
+    return masked_point, mask_center
 
 class Segment_net(nn.Module):
     def __init__(self, num_points):
@@ -318,20 +344,22 @@ class Point_net(nn.Module):
     def __init__(self, num_points, mask_points, head_class):
         super(Point_net, self).__init__()
         self.head_class = head_class
+        self.num_points = num_points
         self.mask_points = mask_points
         self.box_mean = torch.FloatTensor(
-            np.array([4.031432506887061784e+00, 1.617190082644625493e+00, 1.517575757575760020e+00]))
+            np.array([3.996132075471698908e+00,1.617452830188679469e+00,1.517264150943395506e+00]))
         self.seg_model = Segment_net(num_points)
         self.center_model = Center_regression_net(mask_points)
         self.box_model = Box_3D_net(mask_points, head_class)
 
-    def forward(self, points):
+    def forward(self, points, seg_mask):
         # get masking of the input points
-        pred_seg = self.seg_model(points)
+        #pred_seg = self.seg_model(points)
+        pred_seg = None
         # sample points using mask as a distribution
         # shift sampled pointed to their center
-        masked_points, masked_center = sampleFromMask(pred_seg, points, self.mask_points)
-
+        #masked_points, masked_center = sampleFromMask(pred_seg, points, self.mask_points)
+        masked_points, masked_center = sampleFromMask1(seg_mask, points, self.mask_points)
         if args.cuda:
             masked_center, masked_points = masked_center.cuda(), masked_points.cuda()
 
@@ -351,17 +379,23 @@ class Point_net(nn.Module):
                 box_weight=1.0, corner_weight=10.0, trace=False, reduction='elementwise_mean'):
         L1loss = nn.SmoothL1Loss(reduction=reduction)
         CEloss = nn.CrossEntropyLoss(reduction=reduction)
+        batch_size = box_center.size(0)
         target = torch.zeros(masked_center.size(0))
         target_corner = torch.zeros(masked_center.size(0), 8)
-        head_c_onehot = torch.zeros(head_c.size(0), self.head_class)
+        pred_head_c = box_pred[:, 3:self.head_class + 3].argmax(dim=1)
+        head_c_onehot = torch.zeros(pred_head_c.size(0), self.head_class)
 
+        pred_head_c_float= pred_head_c.type(torch.FloatTensor)
         if args.cuda:
-            target, target_corner,head_c_onehot, self.box_mean = target.cuda(), target_corner.cuda(), head_c_onehot.cuda(),self.box_mean.cuda()
+            target, target_corner,head_c_onehot,pred_head_c,pred_head_c_float, self.box_mean = target.cuda(), target_corner.cuda(), head_c_onehot.cuda(),pred_head_c.cuda(),pred_head_c_float.cuda(),self.box_mean.cuda()
 
-        head_c_onehot.scatter_(1, head_c.unsqueeze(-1), 1)
-        mask_loss = CEloss(torch.transpose(pred_seg, 1, 2), seg_mask)
+        head_c_onehot.scatter_(1, pred_head_c.unsqueeze(-1), 1)
+
+        #mask_loss = CEloss(torch.transpose(pred_seg, 1, 2), seg_mask)
+        mask_loss = 0
 
         center_loss = L1loss(torch.norm(box_center- (pred_center_r + masked_center), dim=1), target)
+        #center_loss = 0
 
         box_center_loss = L1loss(torch.norm(box_center- (box_pred[:, :3]+pred_center_r + masked_center), dim=1), target)
 
@@ -373,16 +407,15 @@ class Point_net(nn.Module):
 
         size_residual_loss = L1loss(box_pred[:, 2 * self.head_class + 3:], size_r / self.box_mean)
 
+        pred_heading = pred_head_c_float * 2 * np.pi / self.head_class + torch.sum(box_pred[:, self.head_class + 3:2 * self.head_class + 3] * head_c_onehot, dim=1) * (np.pi / self.head_class)
+        pred_size = box_pred[:, 2 * self.head_class + 3:] * self.box_mean + self.box_mean
+        pred_center = box_pred[:, :3]+pred_center_r + masked_center
+        pred_corner_3d = get_box3d_corners(pred_center, pred_heading, pred_size)
+
         float_head_c = head_c.type(torch.FloatTensor)
 
         if args.cuda:
             float_head_c = float_head_c.cuda()
-
-        pred_heading = float_head_c * 2 * np.pi / self.head_class + torch.sum(
-            box_pred[:, self.head_class + 3:2 * self.head_class + 3] * head_c_onehot, dim=1) * (np.pi / self.head_class)
-        pred_size = box_pred[:, 2 * self.head_class + 3:] * self.box_mean + self.box_mean
-        pred_center = box_pred[:, :3]+pred_center_r + masked_center
-        pred_corner_3d = get_box3d_corners(pred_center, pred_heading, pred_size)
 
         heading = float_head_c * 2 * np.pi / self.head_class + head_r
         flip_heading = heading + np.pi
@@ -402,7 +435,7 @@ class Point_net(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Point net')
-    parser.add_argument('--datapath', default='depth_data/data/training/',
+    parser.add_argument('--datapath', default='obejct_data/data_object_image_2/training/',
                         help='datapath')
     parser.add_argument('--epochs', type=int, default=300,
                         help='number of epochs to train')
@@ -420,15 +453,17 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     if args.cuda:
         torch.cuda.manual_seed(args.seed)
-    train_data = DA.myPointData('obejct_data/data_object_image_2/training/frustum_points_train/', 1024, 12)
-    val_data = DA.myPointData('obejct_data/data_object_image_2/training/frustum_points_val/', 1024, 12)
+    train_data = DA.myPointData(args.datapath + 'frustum_points_train/', 1048, 12)
+    val_data = DA.myPointData(args.datapath + 'frustum_points_val/', 1048, 12)
     train_load = torch.utils.data.DataLoader(train_data, batch_size=32, shuffle=True, num_workers=8, drop_last=False)
-    valid_load = torch.utils.data.DataLoader(val_data,batch_size=100, shuffle=False, num_workers=8, drop_last=False)
+    valid_load = torch.utils.data.DataLoader(val_data, batch_size=100, shuffle=False, num_workers=8, drop_last=False)
     # train 1 epoch for 3d box net
-    model = Point_net(1024, 512, 12)
+    model = Point_net(1048, 512, 12)
     if args.cuda:
         model = model.cuda()
     optimizer = optim.Adam(model.parameters(), lr=0.002)
+    best_IOU = 0
+    best_epoch = 0
     for epoch in range(args.epochs):
         if epoch % 20 == 0:
             adjust_learning_rate(optimizer)
@@ -455,7 +490,7 @@ if __name__ == "__main__":
                 points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r = points_rot.cuda(), seg_mask.cuda(), box3d_center_rot.cuda(), angle_c_rot.cuda(), angle_r_rot.cuda(), size_r.cuda()
 
             optimizer.zero_grad()
-            masked_center, pred_center_r, box_pred, pred_seg = model(points_rot)
+            masked_center, pred_center_r, box_pred, pred_seg = model(points_rot, seg_mask)
             if batch_idx % 50 == 0:
                 print("batch: {}".format(batch_idx))
                 loss, pred_corner_3d, corner_3d, corner_3d_flip = model.getLoss(masked_center, pred_center_r, box_pred,
@@ -471,9 +506,10 @@ if __name__ == "__main__":
             optimizer.step()
 
         model.eval()
-        total_loss = 0
-        IOU = []
-        for batch_idx, (
+        with torch.no_grad():
+            total_loss = 0
+            IOU = []
+            for batch_idx, (
                 points,
                 points_rot,
                 seg_mask,
@@ -484,34 +520,38 @@ if __name__ == "__main__":
                 angle_c_rot,
                 angle_r_rot,
                 size_r) in enumerate(valid_load):
-            points_rot = Variable(torch.FloatTensor(points_rot))
-            seg_mask = Variable(torch.LongTensor(seg_mask))
-            box3d_center_rot = Variable(torch.FloatTensor(box3d_center_rot))
-            angle_c_rot = Variable(torch.LongTensor(angle_c_rot.type(torch.LongTensor)))
-            angle_r_rot = Variable(torch.FloatTensor(angle_r_rot.type(torch.FloatTensor)))
-            size_r = Variable(torch.FloatTensor(size_r))
+                points_rot = Variable(torch.FloatTensor(points_rot))
+                seg_mask = Variable(torch.LongTensor(seg_mask))
+                box3d_center_rot = Variable(torch.FloatTensor(box3d_center_rot))
+                angle_c_rot = Variable(torch.LongTensor(angle_c_rot.type(torch.LongTensor)))
+                angle_r_rot = Variable(torch.FloatTensor(angle_r_rot.type(torch.FloatTensor)))
+                size_r = Variable(torch.FloatTensor(size_r))
 
-            if args.cuda:
-                points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r = points_rot.cuda(), seg_mask.cuda(), box3d_center_rot.cuda(), angle_c_rot.cuda(), angle_r_rot.cuda(), size_r.cuda()
-            masked_center, pred_center_r, box_pred, pred_seg = model(points_rot)
-            loss, pred_corner_3d, corner_3d, corner_3d_flip = model.getLoss(masked_center, pred_center_r, box_pred,
+                if args.cuda:
+                    points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r = points_rot.cuda(), seg_mask.cuda(), box3d_center_rot.cuda(), angle_c_rot.cuda(), angle_r_rot.cuda(), size_r.cuda()
+                masked_center, pred_center_r, box_pred, pred_seg = model(points_rot, seg_mask)
+                loss, pred_corner_3d, corner_3d, corner_3d_flip = model.getLoss(masked_center, pred_center_r, box_pred,
                                                                             pred_seg, seg_mask, box3d_center_rot,
                                                                             angle_c_rot,
-                                                                            angle_r_rot, size_r, reduction='sum')
-            total_loss += loss.detach()
-            print("valid batch {} loss {}".format(batch_idx, loss/size_r.size(0)))
-            pred_corner_3d, corner_3d, corner_3d_flip = pred_corner_3d.detach().cpu().numpy(), corner_3d.detach().cpu().numpy(), corner_3d_flip.detach().cpu().numpy()
+                                                                            angle_r_rot, size_r)
+                total_loss += loss.detach() * points_rot.size(0)
+                pred_corner_3d, corner_3d, corner_3d_flip = pred_corner_3d.detach().cpu().numpy(), corner_3d.detach().cpu().numpy(), corner_3d_flip.detach().cpu().numpy()
 
-            for i in range(corner_3d.shape[0]):
-                IOU.append(box3d_iou(pred_corner_3d[i], corner_3d[i])[0])
+                for i in range(corner_3d.shape[0]):
+                    IOU.append(box3d_iou(pred_corner_3d[i], corner_3d[i])[0])
 
-        total_loss /= len(val_data)
-        print("total loss {}".format(total_loss))
-        IOU = np.array(IOU)
-        print(np.mean(IOU))
-        print(np.sum(IOU > 0.4))
+            total_loss /= len(val_data)
+            print("epoch {} total loss {}".format(epoch, total_loss))
+            IOU = np.array(IOU)
+            print("avg IOU {}".format(np.mean(IOU)))
+            corr = np.sum(IOU > 0.4) * 100.0 / len(val_data)
+            print("% IOU > 0.4 {}".format(corr))
+            if corr > best_IOU:
+                best_epoch = epoch
+                best_IOU = corr
+            print("Best >0.4 IOU epoch {}, {}%".format(best_epoch, best_IOU))
 
-        savefilename = args.savemodel + 'PointNet' + str(epoch) + '.tar'
+        savefilename = args.savemodel + 'PointNetNoMask' + str(epoch) + '.tar'
         torch.save({
             'epoch': epoch,
             'state_dict': model.state_dict(),

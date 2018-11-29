@@ -11,13 +11,12 @@ import torch.utils.data
 from torch.autograd import Variable
 import torch.nn.functional as F
 import numpy as np
-import cv2 as cv
 import time
 import math
 import KITTIloader2015 as ls
 import KITTILoader as DA
 import os
-
+import matplotlib.pyplot as plt
 
 class disparityregression(nn.Module):
     def __init__(self, maxdisp):
@@ -297,7 +296,7 @@ def result(imgL, imgR, disp_true, name):
 
     pred_disp = output3.data.cpu().numpy().astype(np.uint16)
     print(args.datapath + 'CNN_depth/' + name[0])
-    cv.imwrite(args.datapath + 'CNN_depth/' + name[0], pred_disp[0])
+    plt.imsave(args.datapath+'CNN_depth/'+name[0], pred_disp[0], cmap='gray')
 
 
 def adjust_learning_rate(optimizer, epoch):

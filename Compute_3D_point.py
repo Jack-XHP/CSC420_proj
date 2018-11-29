@@ -31,14 +31,12 @@ class Voxel():
 
 def find_3d_point(disp_path):
     f = 721.537700
-    px = 609.559300
-    py = 172.854000
     T = 0.5327119288
     disp = cv.imread(disp_path, 0)
     depth = f * T / disp
     index = np.indices(disp.shape)
-    x = (index[1] - px) / f * depth
-    y = (index[0] - py) / f * depth
+    x = index[1]
+    y = index[0]
     points = np.vstack((x.flatten(), y.flatten(), depth.flatten())).T
     mask = depth.flatten() > 1000
     points[mask, ...] = np.zeros(3)
@@ -109,16 +107,74 @@ def extract_pc_in_box3d(pc, box3d):
     box3d_roi_inds = in_hull(pc[:, 0:3], box3d)
     return pc[box3d_roi_inds, :], box3d_roi_inds
 
+def read_calib_file(filepath):
+    ''' Read in a calibration file and parse into a dictionary.
+    Ref: https://github.com/utiasSTARS/pykitti/blob/master/pykitti/utils.py
+    '''
+    data = {}
+    with open(filepath, 'r') as f:
+        for line in f.readlines():
+            line = line.rstrip()
+            if len(line)==0: continue
+            key, value = line.split(':', 1)
+            # The only non-float values in these files are dates, which
+            # we don't care about anyway
+            try:
+                data[key] = np.array([float(x) for x in value.split()])
+            except ValueError:
+                pass
 
-def extract_frustum(points, img_id, index, point_dir, num_points, perturb_box2d=False, augmentX=1):
-    label_file = 'obejct_data/data_object_image_2/training/label_2/{}.txt'.format(img_id)
+    return data
+
+class Calib(object):
+    def __init__(self, calib_filepath):
+        calibs = read_calib_file(calib_filepath)
+        # Projection matrix from rect camera coord to image2 coord
+        self.P = calibs['P2']
+        self.P = np.reshape(self.P, [3,4])
+        # Rigid transform from Velodyne coord to reference camera coord
+        self.V2C = calibs['Tr_velo_to_cam']
+        self.V2C = np.reshape(self.V2C, [3,4])
+        # Rotation from reference camera coord to rect camera coord
+        self.R0 = calibs['R0_rect']
+        self.R0 = np.reshape(self.R0,[3,3])
+
+        # Camera intrinsics and extrinsics
+        self.c_u = self.P[0,2]
+        self.c_v = self.P[1,2]
+        self.f_u = self.P[0,0]
+        self.f_v = self.P[1,1]
+        self.b_x = self.P[0,3]/(-self.f_u) # relative
+        self.b_y = self.P[1,3]/(-self.f_v)
+
+
+def project_image_to_rect(calib, uv_depth):
+        ''' Input: nx3 first two channels are uv, 3rd channel
+                   is depth in rect camera coord.
+            Output: nx3 points in rect camera coord.
+        '''
+        n = uv_depth.shape[0]
+        x = ((uv_depth[:,0]-calib.c_u)*uv_depth[:,2])/calib.f_u + calib.b_x
+        y = ((uv_depth[:,1]-calib.c_v)*uv_depth[:,2])/calib.f_v + calib.b_y
+        pts_3d_rect = np.zeros((n,3))
+        pts_3d_rect[:,0] = x
+        pts_3d_rect[:,1] = y
+        pts_3d_rect[:,2] = uv_depth[:,2]
+        return pts_3d_rect
+
+
+def extract_frustum(path, points, img_id, index, point_dir, num_points, perturb_box2d=False, augmentX=1):
+    calib_path = path + 'calib/{}.txt'.format(img_id)
+    calib = Calib(calib_path)
+    label_file = path + 'label_2/{}.txt'.format(img_id)
     if os.path.isfile(label_file):
         objects = read_label(label_file)
     else:
-        box_file = 'obejct_data/data_object_image_2/training/box/{}.txt'.format(img_id)
+        box_file = path + 'box/{}.txt'.format(img_id)
         objects = read_2d_box(box_file)
-    image_x = points.shape[1] - 1
-    image_y = points.shape[0] - 1
+    image_x = points.shape[1]
+    image_y = points.shape[0]
+    points = project_image_to_rect(calib, points.reshape(-1, 3)).reshape(image_y, image_x, 3)
     for obj_idx in range(len(objects)):
         # 2D BOX: Get pts rect backprojected
         obj = objects[obj_idx]
@@ -135,17 +191,17 @@ def extract_frustum(points, img_id, index, point_dir, num_points, perturb_box2d=
             if ymax - ymin < 25 or obj.type != 'Car' or xmax - xmin < 10:
                 continue
             xmin = max(0, xmin)
-            xmax = min(image_x, xmax)
+            xmax = min(image_x-1, xmax)
             ymin = max(0, ymin)
-            ymax = min(image_y, ymax)
+            ymax = min(image_y-1, ymax)
             point_2d = points[ymin: ymax + 1, xmin: xmax + 1]
-            while point_2d.size / 3 > num_points:
+            while point_2d.size / 3 > 0.7 * num_points:
                 print(point_2d.shape)
                 point_2d = np.delete(point_2d, list(range(0, point_2d.shape[0], 8)), axis=0)
                 point_2d = np.delete(point_2d, list(range(0, point_2d.shape[1], 8)), axis=1)
             point_2d = point_2d.reshape((-1, 3))
             center_points = points[int(3 / 4.0 * ymin + ymax/4.0): int(3 / 4.0 * ymax + ymin/4.0) + 1, int(3 / 4.0 * xmin + xmax/4.0): int(3 / 4.0 * xmax + xmin/4.0) + 1]
-            while center_points.size / 3 > num_points:
+            while center_points.size / 3 > 0.7 * num_points:
                 print(center_points.shape)
                 center_points = np.delete(center_points, list(range(0, center_points.shape[0], 8)), axis=0)
                 center_points = np.delete(center_points, list(range(0, center_points.shape[1], 8)), axis=1)
@@ -214,9 +270,10 @@ def sampleFromMask_2(distribution, points, num_points):
 
 
 if __name__ == '__main__':
-    dir = 'obejct_data/data_object_image_2/training/CNN_depth/'
-    point_train = 'obejct_data/data_object_image_2/training/frustum_points_train/'
-    point_val = 'obejct_data/data_object_image_2/training/frustum_points_val/'
+    path = 'obejct_data/data_object_image_2/training/'
+    dir = path+'CNN_depth/'
+    point_train = path+'frustum_points_train/'
+    point_val = path+'frustum_points_val/'
     if not os.path.exists(point_train):
         os.makedirs(point_train)
     if not os.path.exists(point_val):
@@ -228,12 +285,12 @@ if __name__ == '__main__':
         points = find_3d_point(dir + img)
         img_id = img.split('.')[0]
         print(img_id)
-        if int(img_id) < 700:
-            train_index, box_count = extract_frustum(points, img_id, train_index, point_train, 1024, perturb_box2d=True,
-                                                     augmentX=10)
+        if int(img_id) < 600:
+            train_index, box_count = extract_frustum(path,points, img_id, train_index, point_train, 1024, perturb_box2d=True,
+                                                     augmentX=5)
             box3d_count = box3d_count + box_count
         else:
-            val_index, box_count = extract_frustum(points, img_id, val_index, point_val, 1024, perturb_box2d=False,
+            val_index, box_count = extract_frustum(path,points, img_id, val_index, point_val, 1024, perturb_box2d=False,
                                                    augmentX=1)
             box3d_count = box3d_count + box_count
     np.savetxt('avg_box_size', np.mean(np.array(box3d_count), axis=0))
