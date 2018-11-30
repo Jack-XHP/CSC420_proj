@@ -298,7 +298,7 @@ def result(imgL, imgR, w, h, name):
     pred_disp = output3.data.cpu().numpy().astype(np.uint16)
 
     if h < 368 or w < 1232:
-        newimg = cv.resize(pred_disp[0], (int(h[0]),int(w[0])))
+        newimg = cv.resize(pred_disp[0], (int(w[0]),int(h[0])))
     else:
         newimg = np.pad(pred_disp[0], ((h[0]-368, 0), (w[0]-1232,0)), 'edge')
     print(newimg.shape)
