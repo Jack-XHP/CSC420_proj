@@ -3,7 +3,8 @@ import os
 import cv2 as cv
 from KITTIloader2015 import read_label, Object3d, read_2d_box
 from scipy.spatial import Delaunay
-
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
 
 class Voxel():
     def __init__(self, size):
@@ -38,7 +39,7 @@ def find_3d_point(disp_path):
     x = index[1]
     y = index[0]
     points = np.vstack((x.flatten(), y.flatten(), depth.flatten())).T
-    mask = depth.flatten() > 1000
+    mask = depth.flatten() > 100
     points[mask, ...] = np.zeros(3)
     return points.reshape((disp.shape[0], disp.shape[1], 3))
 
@@ -78,27 +79,28 @@ def compute_box_3d(obj):
     R = roty(obj.ry)
 
     # 3d bounding box dimensions
-    l = obj.l;
-    w = obj.w;
-    h = obj.h;
+    l = obj.l
+    w = obj.w
+    h = obj.h
 
     # 3d bounding box corners
-    x_corners = [l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2];
-    y_corners = [0, 0, 0, 0, -h, -h, -h, -h];
-    z_corners = [w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2];
+    x_corners = [l/2,l/2,-l/2,-l/2,l/2,l/2,-l/2,-l/2]
+    y_corners = [0,0,0,0,-h,-h,-h,-h]
+    z_corners = [w/2,-w/2,-w/2,w/2,w/2,-w/2,-w/2,w/2]
 
     # rotate and translate 3d bounding box
-    corners_3d = np.dot(R, np.vstack([x_corners, y_corners, z_corners]))
-    # print corners_3d.shape
-    corners_3d[0, :] = corners_3d[0, :] + obj.t[0];
-    corners_3d[1, :] = corners_3d[1, :] + obj.t[1];
-    corners_3d[2, :] = corners_3d[2, :] + obj.t[2];
-    return corners_3d.T
+    corners_3d = np.dot(R, np.vstack([x_corners,y_corners,z_corners]))
+    #print corners_3d.shape
+    corners_3d[0,:] = corners_3d[0,:] + obj.t[0]
+    corners_3d[1,:] = corners_3d[1,:] + obj.t[1]
+    corners_3d[2,:] = corners_3d[2,:] + obj.t[2]
+    return np.transpose(corners_3d)
 
 
 def in_hull(p, hull):
     if not isinstance(hull, Delaunay):
         hull = Delaunay(hull)
+
     return hull.find_simplex(p) >= 0
 
 
@@ -147,15 +149,56 @@ class Calib(object):
         self.b_x = self.P[0,3]/(-self.f_u) # relative
         self.b_y = self.P[1,3]/(-self.f_v)
 
+    def cart2hom(self, pts_3d):
+        ''' Input: nx3 points in Cartesian
+            Oupput: nx4 points in Homogeneous by pending 1
+        '''
+        n = pts_3d.shape[0]
+        pts_3d_hom = np.hstack((pts_3d, np.ones((n,1))))
+        return pts_3d_hom
 
-def project_image_to_rect(calib, uv_depth):
+    def project_velo_to_ref(self, pts_3d_velo):
+        pts_3d_velo = self.cart2hom(pts_3d_velo) # nx4
+        return np.dot(pts_3d_velo, np.transpose(self.V2C))
+
+    def project_rect_to_ref(self, pts_3d_rect):
+        ''' Input and Output are nx3 points '''
+        return np.transpose(np.dot(np.linalg.inv(self.R0), np.transpose(pts_3d_rect)))
+
+    def project_ref_to_rect(self, pts_3d_ref):
+        ''' Input and Output are nx3 points '''
+        return np.transpose(np.dot(self.R0, np.transpose(pts_3d_ref)))
+
+    def project_rect_to_image(self, pts_3d_rect):
+        ''' Input: nx3 points in rect camera coord.
+            Output: nx2 points in image2 coord.
+        '''
+        pts_3d_rect = self.cart2hom(pts_3d_rect)
+        pts_2d = np.dot(pts_3d_rect, np.transpose(self.P)) # nx3
+        pts_2d[:,0] /= pts_2d[:,2]
+        pts_2d[:,1] /= pts_2d[:,2]
+        return pts_2d[:,0:2]
+
+    def project_velo_to_rect(self, pts_3d_velo):
+        pts_3d_ref = self.project_velo_to_ref(pts_3d_velo)
+        return self.project_ref_to_rect(pts_3d_ref)
+
+
+    def project_velo_to_image(self, pts_3d_velo):
+        ''' Input: nx3 points in velodyne coord.
+            Output: nx2 points in image2 coord.
+        '''
+        pts_3d_rect = self.project_velo_to_rect(pts_3d_velo)
+        return self.project_rect_to_image(pts_3d_rect)
+
+    def project_image_to_rect(self, uv_depth):
         ''' Input: nx3 first two channels are uv, 3rd channel
                    is depth in rect camera coord.
             Output: nx3 points in rect camera coord.
         '''
         n = uv_depth.shape[0]
-        x = ((uv_depth[:,0]-calib.c_u)*uv_depth[:,2])/calib.f_u + calib.b_x
-        y = ((uv_depth[:,1]-calib.c_v)*uv_depth[:,2])/calib.f_v + calib.b_y
+        x = ((uv_depth[:,0]-self.c_u)*uv_depth[:,2])/self.f_u + self.b_x
+        y = ((uv_depth[:,1]-self.c_v)*uv_depth[:,2])/self.f_v + self.b_y
         pts_3d_rect = np.zeros((n,3))
         pts_3d_rect[:,0] = x
         pts_3d_rect[:,1] = y
@@ -163,18 +206,55 @@ def project_image_to_rect(calib, uv_depth):
         return pts_3d_rect
 
 
+def get_lidar_in_image_fov(pc_velo, calib, xmin, ymin, xmax, ymax,
+                           return_more=False, clip_distance=2.0):
+    ''' Filter lidar points, keep those in image FOV '''
+    pts_2d = calib.project_velo_to_image(pc_velo)
+    fov_inds = (pts_2d[:,0]<xmax) & (pts_2d[:,0]>=xmin) & \
+        (pts_2d[:,1]<ymax) & (pts_2d[:,1]>=ymin)
+    fov_inds = fov_inds & (pc_velo[:,0]>clip_distance)
+    imgfov_pc_velo = pc_velo[fov_inds,:]
+    if return_more:
+        return imgfov_pc_velo, pts_2d, fov_inds
+    else:
+        return imgfov_pc_velo
+
+
 def extract_frustum(path, points, img_id, index, point_dir, num_points, perturb_box2d=False, augmentX=1):
+    image_y = points.shape[1]
+    image_x = points.shape[0]
+
     calib_path = path + 'calib/{}.txt'.format(img_id)
     calib = Calib(calib_path)
+
+    velo_path = path + 'velodyne/{}.bin'.format(img_id)
+    scan = np.fromfile(velo_path, dtype=np.float32)
+    scan = scan.reshape((-1, 4))
+    velo_rect = calib.project_velo_to_rect(scan[:, :3])
+    _, pc_image_coord, img_fov_inds = get_lidar_in_image_fov(scan[:, :3], calib, 0, 0, image_x, image_y, True)
     label_file = path + 'label_2/{}.txt'.format(img_id)
+
     if os.path.isfile(label_file):
         objects = read_label(label_file)
     else:
         box_file = path + 'box/{}.txt'.format(img_id)
         objects = read_2d_box(box_file)
-    image_x = points.shape[1]
-    image_y = points.shape[0]
-    points = project_image_to_rect(calib, points.reshape(-1, 3)).reshape(image_y, image_x, 3)
+
+    points = calib.project_image_to_rect(points.reshape(-1, 3)).reshape(image_y, image_x, 3)
+    points_t = points.reshape(-1, 3)
+    points_t = points_t[points_t[:, 2] != 0, :]
+    choice = np.random.choice(points_t.shape[0], 5000, replace=True)
+    points_t = points_t[choice]
+    velo_rect_t = velo_rect[img_fov_inds, :]
+    print(points_t.shape)
+    print(velo_rect_t.shape)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(points_t[:, 0].flatten(), points_t[:, 1].flatten(), points_t[:, 2].flatten(), c='r', marker='o')
+    ax.scatter(velo_rect_t[:, 0].flatten(), velo_rect_t[:, 1].flatten(), velo_rect_t[:, 2].flatten(), c='b', marker='^')
+    plt.show()
+    return index, []
+
     for obj_idx in range(len(objects)):
         # 2D BOX: Get pts rect backprojected
         obj = objects[obj_idx]
@@ -182,49 +262,62 @@ def extract_frustum(path, points, img_id, index, point_dir, num_points, perturb_
         datas = {}
         box3d_count = []
         box3d_size = None
+        if obj.type != 'Car' :
+            continue
+
         for i in range(augmentX):
             # Augment data by box2d perturbation
             if perturb_box2d:
                 xmin, ymin, xmax, ymax = random_shift_box2d(box2d).astype(int)
             else:
                 xmin, ymin, xmax, ymax = box2d.astype(int)
-            if ymax - ymin < 25 or obj.type != 'Car' or xmax - xmin < 10:
-                continue
+
             xmin = max(0, xmin)
             xmax = min(image_x-1, xmax)
             ymin = max(0, ymin)
             ymax = min(image_y-1, ymax)
+
+            if ymax - ymin < 25 or xmax < xmin :
+                continue
+
+            box_fov_inds = (pc_image_coord[:,0]<xmax) & (pc_image_coord[:,0]>=xmin) & (pc_image_coord[:,1]<ymax) & (pc_image_coord[:,1]>=ymin)
+
+            box_fov_inds = box_fov_inds & img_fov_inds
+            velo_in_box_fov = velo_rect[box_fov_inds,:]
+            print(velo_in_box_fov.shape)
+
             point_2d = points[ymin: ymax + 1, xmin: xmax + 1]
-            while point_2d.size / 3 > 0.7 * num_points:
-                print(point_2d.shape)
-                point_2d = np.delete(point_2d, list(range(0, point_2d.shape[0], 8)), axis=0)
-                point_2d = np.delete(point_2d, list(range(0, point_2d.shape[1], 8)), axis=1)
             point_2d = point_2d.reshape((-1, 3))
-            center_points = points[int(3 / 4.0 * ymin + ymax/4.0): int(3 / 4.0 * ymax + ymin/4.0) + 1, int(3 / 4.0 * xmin + xmax/4.0): int(3 / 4.0 * xmax + xmin/4.0) + 1]
-            while center_points.size / 3 > 0.7 * num_points:
-                print(center_points.shape)
-                center_points = np.delete(center_points, list(range(0, center_points.shape[0], 8)), axis=0)
-                center_points = np.delete(center_points, list(range(0, center_points.shape[1], 8)), axis=1)
-            center_points = center_points.reshape((-1, 3))
-            point_2d = np.vstack((point_2d, center_points))
+
+
             box2d_corner = np.array([xmin, ymin, xmax, ymax])
             box2d_center = np.array([(xmin + xmax) / 2.0, (ymin + ymax) / 2.0]).astype(int)
+
             center = points[(box2d_center[1], box2d_center[0])]
             frustum_angle = -1 * np.arctan2(center[2], center[0])
             if np.all(obj.t == 0):
                 obj.t = center
             box3d_corner = compute_box_3d(obj)
+            print(box3d_corner)
             box3d_center = obj.t
             box3d_size = np.array([obj.l, obj.w, obj.h])
             _, inds = extract_pc_in_box3d(point_2d, box3d_corner)
-            print(inds.sum())
-            if inds.sum() < 1:
-                print("skip")
-                continue
             label = np.zeros(point_2d.shape[0])
             label[inds] = 1
+            print(label.sum())
+            if label.sum() == 0:
+                print("skip")
+                continue
+            _, velo_inds = extract_pc_in_box3d(velo_in_box_fov, box3d_corner)
+            velo_label = np.zeros(velo_in_box_fov.shape[0])
+            velo_label[velo_inds] = 1
+            print(velo_label.sum())
+            if velo_label.sum() == 0:
+                print("skip")
+                continue
             datas['img_id'] = img_id
             datas['point_2d'] = point_2d
+            datas['point_velo'] = velo_in_box_fov
             datas['box2d_corner'] = box2d_corner
             datas['box3d_corner'] = box3d_corner
             datas['box3d_center'] = box3d_center
@@ -232,6 +325,7 @@ def extract_frustum(path, points, img_id, index, point_dir, num_points, perturb_
             datas['frustum_angle'] = frustum_angle
             datas['heading'] = obj.ry
             datas['label'] = label
+            datas['velo_label'] = velo_label
             np.save(point_dir + str(index), datas)
             datas = {}
             index += 1
@@ -282,10 +376,11 @@ if __name__ == '__main__':
     val_index = 0
     box3d_count = []
     for img in os.listdir(dir):
-        points = find_3d_point(dir + img)
         img_id = img.split('.')[0]
-        print(img_id)
-        if int(img_id) < 600:
+
+        points = find_3d_point(dir + img)
+        if int(img_id) < 700:
+
             train_index, box_count = extract_frustum(path,points, img_id, train_index, point_train, 1024, perturb_box2d=True,
                                                      augmentX=5)
             box3d_count = box3d_count + box_count

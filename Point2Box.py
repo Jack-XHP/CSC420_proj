@@ -354,12 +354,12 @@ class Point_net(nn.Module):
 
     def forward(self, points, seg_mask):
         # get masking of the input points
-        #pred_seg = self.seg_model(points)
-        pred_seg = None
+        pred_seg = self.seg_model(points)
+        #pred_seg = None
         # sample points using mask as a distribution
         # shift sampled pointed to their center
-        #masked_points, masked_center = sampleFromMask(pred_seg, points, self.mask_points)
-        masked_points, masked_center = sampleFromMask1(seg_mask, points, self.mask_points)
+        masked_points, masked_center = sampleFromMask(pred_seg, points, self.mask_points)
+        #masked_points, masked_center = sampleFromMask1(seg_mask, points, self.mask_points)
         if args.cuda:
             masked_center, masked_points = masked_center.cuda(), masked_points.cuda()
 
@@ -391,8 +391,8 @@ class Point_net(nn.Module):
 
         head_c_onehot.scatter_(1, pred_head_c.unsqueeze(-1), 1)
 
-        #mask_loss = CEloss(torch.transpose(pred_seg, 1, 2), seg_mask)
-        mask_loss = 0
+        mask_loss = CEloss(torch.transpose(pred_seg, 1, 2), seg_mask)
+        #mask_loss = 0
 
         center_loss = L1loss(torch.norm(box_center- (pred_center_r + masked_center), dim=1), target)
         #center_loss = 0
@@ -478,28 +478,33 @@ if __name__ == "__main__":
                 angle_r,
                 angle_c_rot,
                 angle_r_rot,
-                size_r) in enumerate(train_load):
+                size_r,
+                velo,
+                velo_rot,
+                velo_seg) in enumerate(train_load):
             points_rot = Variable(torch.FloatTensor(points_rot))
+            velo_rot = Variable(torch.FloatTensor(velo_rot))
             seg_mask = Variable(torch.LongTensor(seg_mask))
+            velo_seg = Variable(torch.LongTensor(velo_seg))
             box3d_center_rot = Variable(torch.FloatTensor(box3d_center_rot))
             angle_c_rot = Variable(torch.LongTensor(angle_c_rot.type(torch.LongTensor)))
             angle_r_rot = Variable(torch.FloatTensor(angle_r_rot.type(torch.FloatTensor)))
             size_r = Variable(torch.FloatTensor(size_r))
 
             if args.cuda:
-                points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r = points_rot.cuda(), seg_mask.cuda(), box3d_center_rot.cuda(), angle_c_rot.cuda(), angle_r_rot.cuda(), size_r.cuda()
+                points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r,velo_rot,velo_seg = points_rot.cuda(), seg_mask.cuda(), box3d_center_rot.cuda(), angle_c_rot.cuda(), angle_r_rot.cuda(), size_r.cuda(),velo_rot.cuda(), velo_seg.cuda()
 
             optimizer.zero_grad()
-            masked_center, pred_center_r, box_pred, pred_seg = model(points_rot, seg_mask)
+            masked_center, pred_center_r, box_pred, pred_seg = model(velo_rot, velo_seg)
             if batch_idx % 50 == 0:
                 print("batch: {}".format(batch_idx))
                 loss, pred_corner_3d, corner_3d, corner_3d_flip = model.getLoss(masked_center, pred_center_r, box_pred,
-                                                                            pred_seg, seg_mask, box3d_center_rot,
+                                                                            pred_seg, velo_seg, box3d_center_rot,
                                                                             angle_c_rot,angle_r_rot, size_r, 1, 10, True)
                 print("total loss {}".format(loss))
             else:
                 loss, pred_corner_3d, corner_3d, corner_3d_flip = model.getLoss(masked_center, pred_center_r, box_pred,
-                                                                                pred_seg, seg_mask, box3d_center_rot,
+                                                                                pred_seg, velo_seg, box3d_center_rot,
                                                                                 angle_c_rot,angle_r_rot, size_r)
 
             loss.backward()
@@ -519,19 +524,25 @@ if __name__ == "__main__":
                 angle_r,
                 angle_c_rot,
                 angle_r_rot,
-                size_r) in enumerate(valid_load):
+                size_r,
+                velo,
+                velo_rot,
+                velo_seg) in enumerate(valid_load):
                 points_rot = Variable(torch.FloatTensor(points_rot))
+                velo_rot = Variable(torch.FloatTensor(velo_rot))
                 seg_mask = Variable(torch.LongTensor(seg_mask))
+                velo_seg = Variable(torch.LongTensor(velo_seg))
                 box3d_center_rot = Variable(torch.FloatTensor(box3d_center_rot))
                 angle_c_rot = Variable(torch.LongTensor(angle_c_rot.type(torch.LongTensor)))
                 angle_r_rot = Variable(torch.FloatTensor(angle_r_rot.type(torch.FloatTensor)))
                 size_r = Variable(torch.FloatTensor(size_r))
 
                 if args.cuda:
-                    points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r = points_rot.cuda(), seg_mask.cuda(), box3d_center_rot.cuda(), angle_c_rot.cuda(), angle_r_rot.cuda(), size_r.cuda()
-                masked_center, pred_center_r, box_pred, pred_seg = model(points_rot, seg_mask)
+                    points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r,velo_rot,velo_seg = points_rot.cuda(), seg_mask.cuda(), box3d_center_rot.cuda(), angle_c_rot.cuda(), angle_r_rot.cuda(), size_r.cuda(),velo_rot.cuda(), velo_seg.cuda()
+
+                masked_center, pred_center_r, box_pred, pred_seg = model(velo_rot, velo_seg)
                 loss, pred_corner_3d, corner_3d, corner_3d_flip = model.getLoss(masked_center, pred_center_r, box_pred,
-                                                                            pred_seg, seg_mask, box3d_center_rot,
+                                                                            pred_seg, velo_seg, box3d_center_rot,
                                                                             angle_c_rot,
                                                                             angle_r_rot, size_r)
                 total_loss += loss.detach() * points_rot.size(0)
@@ -544,7 +555,7 @@ if __name__ == "__main__":
             print("epoch {} total loss {}".format(epoch, total_loss))
             IOU = np.array(IOU)
             print("avg IOU {}".format(np.mean(IOU)))
-            corr = np.sum(IOU > 0.4) * 100.0 / len(val_data)
+            corr = np.sum(IOU > 0.4) * 100 / len(val_data)
             print("% IOU > 0.4 {}".format(corr))
             if corr > best_IOU:
                 best_epoch = epoch

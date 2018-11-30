@@ -138,12 +138,16 @@ class myPointData(data.Dataset):
         datas = point_loader(point)
         rot_angle = np.pi / 2 + datas['frustum_angle']
         points = datas['point_2d']
+        velo = datas['point_velo']
         # sampling n points from whole point cloud
         choice = np.random.choice(points.shape[0], self.num_point, replace=True)
         points = points[choice, :]
-
         # find the mask label for 3d points
         seg_mask = datas['label'][choice]
+
+        choice = np.random.choice(velo.shape[0], self.num_point, replace=True)
+        velo = velo[choice, :]
+        velo_seg =datas['velo_label'][choice]
 
         # get 3d box center
         box3d_corner = datas['box3d_corner']
@@ -172,6 +176,7 @@ class myPointData(data.Dataset):
         size_r = size2class(datas['box3d_size'])
 
         # rotate points and boxes to center of frustum
+        velo_rot = rotate_pc_along_y(velo.copy(), rot_angle)
         points_rot = rotate_pc_along_y(points.copy(), rot_angle)
         box3d_center_rot = rotate_pc_along_y(np.expand_dims(box3d_center.copy(), 0), rot_angle).squeeze()
         angle_c_rot, angle_r_rot = angle2class(head - rot_angle, self.num_angle)
@@ -185,7 +190,10 @@ class myPointData(data.Dataset):
                angle_r, \
                angle_c_rot, \
                angle_r_rot, \
-               torch.FloatTensor(size_r)
+               torch.FloatTensor(size_r), \
+               torch.FloatTensor(velo), \
+               torch.FloatTensor(velo_rot), \
+               torch.LongTensor(velo_seg)
 
     def __len__(self):
         return len(self.points)
@@ -253,7 +261,7 @@ class myImageFloder(data.Dataset):
             left_img = processed(left_img)
             right_img = processed(right_img)
 
-            return left_img, right_img, dataL, name
+            return left_img, right_img, dataL, name, w, h
 
     def __len__(self):
         return len(self.left)

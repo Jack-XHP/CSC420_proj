@@ -17,6 +17,7 @@ import KITTIloader2015 as ls
 import KITTILoader as DA
 import os
 import matplotlib.pyplot as plt
+import cv2 as cv
 
 class disparityregression(nn.Module):
     def __init__(self, maxdisp):
@@ -284,7 +285,7 @@ def test(imgL, imgR, disp_true):
     return 1 - (float(torch.sum(correct)) / float(len(index[0])))
 
 
-def result(imgL, imgR, disp_true, name):
+def result(imgL, imgR, w, h, name):
     model.eval()
     imgL = Variable(torch.FloatTensor(imgL))
     imgR = Variable(torch.FloatTensor(imgR))
@@ -295,8 +296,13 @@ def result(imgL, imgR, disp_true, name):
         output3 = model(imgL, imgR)
 
     pred_disp = output3.data.cpu().numpy().astype(np.uint16)
-    print(args.datapath + 'CNN_depth/' + name[0])
-    plt.imsave(args.datapath+'CNN_depth/'+name[0], pred_disp[0], cmap='gray')
+    if h < 368 or w < 1232:
+        newimg = cv.resize(pred_disp[0], (int(h[0]),int(w[0])))
+    else:
+        newimg = np.pad(pred_disp[0], ((h[0]-368, 0), (w[0]-1232,0)), 'edge')
+    print(newimg.shape)
+    print(w[0],h[0])
+    plt.imsave(args.datapath+'CNN_depth/'+name[0],newimg, cmap='gray')
 
 
 def adjust_learning_rate(optimizer, epoch):
@@ -319,7 +325,7 @@ def main():
         adjust_learning_rate(optimizer, epoch)
 
         ## training ##
-        for batch_idx, (imgL_crop, imgR_crop, disp_crop_L, name) in enumerate(TrainImgLoader):
+        for batch_idx, (imgL_crop, imgR_crop, disp_crop_L, name, w, h) in enumerate(TrainImgLoader):
             start_time = time.time()
 
             loss = train(imgL_crop, imgR_crop, disp_crop_L)
@@ -329,7 +335,7 @@ def main():
 
         ## Test ##
 
-        for batch_idx, (imgL, imgR, disp_L, name) in enumerate(TestImgLoader):
+        for batch_idx, (imgL, imgR, disp_L, name, w, h) in enumerate(TestImgLoader):
             test_loss = test(imgL, imgR, disp_L)
             print('Iter %d 3-px error in val = %.3f' % (batch_idx, test_loss * 100))
             total_test_loss += test_loss
@@ -408,8 +414,8 @@ if __name__ == '__main__':
         directory = args.datapath + 'CNN_depth/'
         if not os.path.exists(directory):
             os.makedirs(directory)
-        for batch_idx, (imgL, imgR, disp_L, name) in enumerate(ResultImgLoader):
+        for batch_idx, (imgL, imgR, disp_L, name, w, h) in enumerate(ResultImgLoader):
             print(imgL.size())
-            result(imgL, imgR, disp_L, name)
+            result(imgL, imgR, w, h, name)
     else:
         main()
