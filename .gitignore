@@ -2,7 +2,6 @@
 __pycache__/
 *.py[cod]
 *.png
-training
 *$py.class
 
 # C extensions
