@@ -271,6 +271,7 @@ class Segment_net(nn.Module):
         cat_features = torch.cat((feature, expand_global_feature), dim=1)
         seg_mask = self.segment_net(cat_features)
         return torch.transpose(seg_mask.squeeze(-1), 1, 2)
+<<<<<<< HEAD
 
     def getLoss(self, input, target):
         return self.loss(input, target)
@@ -300,6 +301,37 @@ class Box_3D_net(nn.Module):
             nn.Linear(256, 3 + 2 * num_head + 3)
         )
 
+=======
+
+    def getLoss(self, input, target):
+        return self.loss(input, target)
+
+
+class Box_3D_net(nn.Module):
+    def __init__(self, num_points, num_head):
+        super(Box_3D_net, self).__init__()
+        self.feature_net = nn.Sequential(
+            convbn(1, 128, 1, 1, 0, 1),
+            nn.ReLU(inplace=True),
+            convbn(128, 128, 1, 1, 0, 1),
+            nn.ReLU(inplace=True),
+            convbn(128, 256, 1, 1, 0, 1),
+            nn.ReLU(inplace=True),
+            convbn(256, 512, 1, 1, 0, 1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d([num_points, 1])
+        )
+        self.fc_net = nn.Sequential(
+            nn.Linear(1536, 512),
+            nn.BatchNorm1d(512),
+            nn.ReLU(inplace=True),
+            nn.Linear(512, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(inplace=True),
+            nn.Linear(256, 3 + 2 * num_head + 3)
+        )
+
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
     def forward(self, points):
         new_points = points.unsqueeze(1)
         feature = self.feature_net(new_points)
@@ -354,12 +386,30 @@ class Point_net(nn.Module):
 
     def forward(self, points, seg_mask):
         # get masking of the input points
+<<<<<<< HEAD
         pred_seg = self.seg_model(points)
         #pred_seg = None
         # sample points using mask as a distribution
         # shift sampled pointed to their center
         masked_points, masked_center = sampleFromMask(pred_seg, points, self.mask_points)
         #masked_points, masked_center = sampleFromMask1(seg_mask, points, self.mask_points)
+=======
+<<<<<<< HEAD
+        pred_seg = self.seg_model(points)
+        #pred_seg = None
+        # sample points using mask as a distribution
+        # shift sampled pointed to their center
+        masked_points, masked_center = sampleFromMask(pred_seg, points, self.mask_points)
+        #masked_points, masked_center = sampleFromMask1(seg_mask, points, self.mask_points)
+=======
+        #pred_seg = self.seg_model(points)
+        pred_seg = None
+        # sample points using mask as a distribution
+        # shift sampled pointed to their center
+        #masked_points, masked_center = sampleFromMask(pred_seg, points, self.mask_points)
+        masked_points, masked_center = sampleFromMask1(seg_mask, points, self.mask_points)
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
+>>>>>>> f9ca4c90e1fc9695698c83af6390e3c514a18276
         if args.cuda:
             masked_center, masked_points = masked_center.cuda(), masked_points.cuda()
 
@@ -391,8 +441,18 @@ class Point_net(nn.Module):
 
         head_c_onehot.scatter_(1, pred_head_c.unsqueeze(-1), 1)
 
+<<<<<<< HEAD
         mask_loss = CEloss(torch.transpose(pred_seg, 1, 2), seg_mask)
         #mask_loss = 0
+=======
+<<<<<<< HEAD
+        mask_loss = CEloss(torch.transpose(pred_seg, 1, 2), seg_mask)
+        #mask_loss = 0
+=======
+        #mask_loss = CEloss(torch.transpose(pred_seg, 1, 2), seg_mask)
+        mask_loss = 0
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
+>>>>>>> f9ca4c90e1fc9695698c83af6390e3c514a18276
 
         center_loss = L1loss(torch.norm(box_center- (pred_center_r + masked_center), dim=1), target)
         #center_loss = 0
@@ -478,20 +538,41 @@ if __name__ == "__main__":
                 angle_r,
                 angle_c_rot,
                 angle_r_rot,
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> f9ca4c90e1fc9695698c83af6390e3c514a18276
                 size_r,
                 velo,
                 velo_rot,
                 velo_seg) in enumerate(train_load):
+<<<<<<< HEAD
+=======
             points_rot = Variable(torch.FloatTensor(points_rot))
             velo_rot = Variable(torch.FloatTensor(velo_rot))
             seg_mask = Variable(torch.LongTensor(seg_mask))
             velo_seg = Variable(torch.LongTensor(velo_seg))
+=======
+                size_r) in enumerate(train_load):
+>>>>>>> f9ca4c90e1fc9695698c83af6390e3c514a18276
+            points_rot = Variable(torch.FloatTensor(points_rot))
+            velo_rot = Variable(torch.FloatTensor(velo_rot))
+            seg_mask = Variable(torch.LongTensor(seg_mask))
+<<<<<<< HEAD
+            velo_seg = Variable(torch.LongTensor(velo_seg))
+=======
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
+>>>>>>> f9ca4c90e1fc9695698c83af6390e3c514a18276
             box3d_center_rot = Variable(torch.FloatTensor(box3d_center_rot))
             angle_c_rot = Variable(torch.LongTensor(angle_c_rot.type(torch.LongTensor)))
             angle_r_rot = Variable(torch.FloatTensor(angle_r_rot.type(torch.FloatTensor)))
             size_r = Variable(torch.FloatTensor(size_r))
 
             if args.cuda:
+<<<<<<< HEAD
+                points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r,velo_rot,velo_seg = points_rot.cuda(), seg_mask.cuda(), box3d_center_rot.cuda(), angle_c_rot.cuda(), angle_r_rot.cuda(), size_r.cuda(),velo_rot.cuda(), velo_seg.cuda()
+=======
+<<<<<<< HEAD
                 points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r,velo_rot,velo_seg = points_rot.cuda(), seg_mask.cuda(), box3d_center_rot.cuda(), angle_c_rot.cuda(), angle_r_rot.cuda(), size_r.cuda(),velo_rot.cuda(), velo_seg.cuda()
 
             optimizer.zero_grad()
@@ -500,11 +581,34 @@ if __name__ == "__main__":
                 print("batch: {}".format(batch_idx))
                 loss, pred_corner_3d, corner_3d, corner_3d_flip = model.getLoss(masked_center, pred_center_r, box_pred,
                                                                             pred_seg, velo_seg, box3d_center_rot,
+=======
+                points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r = points_rot.cuda(), seg_mask.cuda(), box3d_center_rot.cuda(), angle_c_rot.cuda(), angle_r_rot.cuda(), size_r.cuda()
+>>>>>>> f9ca4c90e1fc9695698c83af6390e3c514a18276
+
+            optimizer.zero_grad()
+            masked_center, pred_center_r, box_pred, pred_seg = model(velo_rot, velo_seg)
+            if batch_idx % 50 == 0:
+                print("batch: {}".format(batch_idx))
+                loss, pred_corner_3d, corner_3d, corner_3d_flip = model.getLoss(masked_center, pred_center_r, box_pred,
+<<<<<<< HEAD
+                                                                            pred_seg, velo_seg, box3d_center_rot,
+=======
+                                                                            pred_seg, seg_mask, box3d_center_rot,
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
+>>>>>>> f9ca4c90e1fc9695698c83af6390e3c514a18276
                                                                             angle_c_rot,angle_r_rot, size_r, 1, 10, True)
                 print("total loss {}".format(loss))
             else:
                 loss, pred_corner_3d, corner_3d, corner_3d_flip = model.getLoss(masked_center, pred_center_r, box_pred,
+<<<<<<< HEAD
                                                                                 pred_seg, velo_seg, box3d_center_rot,
+=======
+<<<<<<< HEAD
+                                                                                pred_seg, velo_seg, box3d_center_rot,
+=======
+                                                                                pred_seg, seg_mask, box3d_center_rot,
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
+>>>>>>> f9ca4c90e1fc9695698c83af6390e3c514a18276
                                                                                 angle_c_rot,angle_r_rot, size_r)
 
             loss.backward()
@@ -524,25 +628,57 @@ if __name__ == "__main__":
                 angle_r,
                 angle_c_rot,
                 angle_r_rot,
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> f9ca4c90e1fc9695698c83af6390e3c514a18276
                 size_r,
                 velo,
                 velo_rot,
                 velo_seg) in enumerate(valid_load):
+<<<<<<< HEAD
+=======
                 points_rot = Variable(torch.FloatTensor(points_rot))
                 velo_rot = Variable(torch.FloatTensor(velo_rot))
                 seg_mask = Variable(torch.LongTensor(seg_mask))
                 velo_seg = Variable(torch.LongTensor(velo_seg))
+=======
+                size_r) in enumerate(valid_load):
+>>>>>>> f9ca4c90e1fc9695698c83af6390e3c514a18276
+                points_rot = Variable(torch.FloatTensor(points_rot))
+                velo_rot = Variable(torch.FloatTensor(velo_rot))
+                seg_mask = Variable(torch.LongTensor(seg_mask))
+<<<<<<< HEAD
+                velo_seg = Variable(torch.LongTensor(velo_seg))
+=======
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
+>>>>>>> f9ca4c90e1fc9695698c83af6390e3c514a18276
                 box3d_center_rot = Variable(torch.FloatTensor(box3d_center_rot))
                 angle_c_rot = Variable(torch.LongTensor(angle_c_rot.type(torch.LongTensor)))
                 angle_r_rot = Variable(torch.FloatTensor(angle_r_rot.type(torch.FloatTensor)))
                 size_r = Variable(torch.FloatTensor(size_r))
 
                 if args.cuda:
+<<<<<<< HEAD
                     points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r,velo_rot,velo_seg = points_rot.cuda(), seg_mask.cuda(), box3d_center_rot.cuda(), angle_c_rot.cuda(), angle_r_rot.cuda(), size_r.cuda(),velo_rot.cuda(), velo_seg.cuda()
 
                 masked_center, pred_center_r, box_pred, pred_seg = model(velo_rot, velo_seg)
                 loss, pred_corner_3d, corner_3d, corner_3d_flip = model.getLoss(masked_center, pred_center_r, box_pred,
                                                                             pred_seg, velo_seg, box3d_center_rot,
+=======
+<<<<<<< HEAD
+                    points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r,velo_rot,velo_seg = points_rot.cuda(), seg_mask.cuda(), box3d_center_rot.cuda(), angle_c_rot.cuda(), angle_r_rot.cuda(), size_r.cuda(),velo_rot.cuda(), velo_seg.cuda()
+
+                masked_center, pred_center_r, box_pred, pred_seg = model(velo_rot, velo_seg)
+                loss, pred_corner_3d, corner_3d, corner_3d_flip = model.getLoss(masked_center, pred_center_r, box_pred,
+                                                                            pred_seg, velo_seg, box3d_center_rot,
+=======
+                    points_rot, seg_mask, box3d_center_rot, angle_c_rot, angle_r_rot, size_r = points_rot.cuda(), seg_mask.cuda(), box3d_center_rot.cuda(), angle_c_rot.cuda(), angle_r_rot.cuda(), size_r.cuda()
+                masked_center, pred_center_r, box_pred, pred_seg = model(points_rot, seg_mask)
+                loss, pred_corner_3d, corner_3d, corner_3d_flip = model.getLoss(masked_center, pred_center_r, box_pred,
+                                                                            pred_seg, seg_mask, box3d_center_rot,
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
+>>>>>>> f9ca4c90e1fc9695698c83af6390e3c514a18276
                                                                             angle_c_rot,
                                                                             angle_r_rot, size_r)
                 total_loss += loss.detach() * points_rot.size(0)
@@ -555,7 +691,15 @@ if __name__ == "__main__":
             print("epoch {} total loss {}".format(epoch, total_loss))
             IOU = np.array(IOU)
             print("avg IOU {}".format(np.mean(IOU)))
+<<<<<<< HEAD
             corr = np.sum(IOU > 0.4) * 100 / len(val_data)
+=======
+<<<<<<< HEAD
+            corr = np.sum(IOU > 0.4) * 100 / len(val_data)
+=======
+            corr = np.sum(IOU > 0.4) * 100.0 / len(val_data)
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
+>>>>>>> f9ca4c90e1fc9695698c83af6390e3c514a18276
             print("% IOU > 0.4 {}".format(corr))
             if corr > best_IOU:
                 best_epoch = epoch

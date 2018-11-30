@@ -296,6 +296,7 @@ def result(imgL, imgR, w, h, name):
         output3 = model(imgL, imgR)
 
     pred_disp = output3.data.cpu().numpy().astype(np.uint16)
+
     if h < 368 or w < 1232:
         newimg = cv.resize(pred_disp[0], (int(h[0]),int(w[0])))
     else:
@@ -303,7 +304,6 @@ def result(imgL, imgR, w, h, name):
     print(newimg.shape)
     print(w[0],h[0])
     plt.imsave(args.datapath+'CNN_depth/'+name[0],newimg, cmap='gray')
-
 
 def adjust_learning_rate(optimizer, epoch):
     if epoch <= 200:
