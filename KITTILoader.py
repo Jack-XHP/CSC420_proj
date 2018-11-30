@@ -13,7 +13,9 @@ import os
 __imagenet_stats = {'mean': [0.485, 0.456, 0.406],
                     'std': [0.229, 0.224, 0.225]}
 
-__box_mean = [4.031432506887061784e+00, 1.617190082644625493e+00, 1.517575757575760020e+00]
+__box_mean = [3.996132075471698908e+00,
+1.617452830188679469e+00,
+1.517264150943395506e+00]
 
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',
@@ -123,48 +125,75 @@ def class2size(residual):
 
 
 class myPointData(data.Dataset):
-    def __init__(self, points_dir, num_point, num_angle):
+    def __init__(self, points_dir, num_point, num_angle, random_flip=False, random_shift=False):
         self.points = [points_dir + point for point in os.listdir(points_dir)]
+        self.points = self.points
         self.num_point = num_point
         self.num_angle = num_angle
+        self.random_flip = random_flip
+        self.random_shift = random_shift
 
     def __getitem__(self, index):
         point = self.points[index]
         datas = point_loader(point)
         rot_angle = np.pi / 2 + datas['frustum_angle']
         points = datas['point_2d']
+        velo = datas['point_velo']
         # sampling n points from whole point cloud
         choice = np.random.choice(points.shape[0], self.num_point, replace=True)
         points = points[choice, :]
-
         # find the mask label for 3d points
         seg_mask = datas['label'][choice]
 
+        choice = np.random.choice(velo.shape[0], self.num_point, replace=True)
+        velo = velo[choice, :]
+        velo_seg =datas['velo_label'][choice]
+
         # get 3d box center
         box3d_corner = datas['box3d_corner']
-        box3d_center = (box3d_corner[0, :] + box3d_corner[6, :]) / 2.0
+        box3d_center = datas['box3d_center']
+
+        head = datas['heading']
+
+        # Data Augmentation
+        if self.random_flip:
+            # note: rot_angle won't be correct if we have random_flip
+            # so do not use it in case of random flipping.
+            if np.random.random()>0.5: # 50% chance flipping
+                points[:,0] *= -1
+                box3d_center[0] *= -1
+                head = np.pi - head
+
+        if self.random_shift:
+            dist = np.sqrt(np.sum(box3d_center[0]**2+box3d_center[1]**2))
+            shift = np.clip(np.random.randn()*dist*0.05, dist*0.8, dist*1.2)
+            points[:,2] += shift
+            box3d_center[2] += shift
 
         # convert heading to 12 classes and residual
-        head = datas['heading']
         angle_c, angle_r = angle2class(head, self.num_angle)
         # convert 3d box size to mean + residual
         size_r = size2class(datas['box3d_size'])
 
         # rotate points and boxes to center of frustum
+        velo_rot = rotate_pc_along_y(velo.copy(), rot_angle)
         points_rot = rotate_pc_along_y(points.copy(), rot_angle)
         box3d_center_rot = rotate_pc_along_y(np.expand_dims(box3d_center.copy(), 0), rot_angle).squeeze()
         angle_c_rot, angle_r_rot = angle2class(head - rot_angle, self.num_angle)
 
         return torch.FloatTensor(points), \
                torch.FloatTensor(points_rot), \
-               torch.FloatTensor(seg_mask), \
+               torch.LongTensor(seg_mask), \
                torch.FloatTensor(box3d_center), \
                torch.FloatTensor(box3d_center_rot), \
-               torch.FloatTensor([angle_c]), \
-               torch.FloatTensor([angle_r]), \
-               torch.FloatTensor([angle_c_rot]), \
-               torch.FloatTensor([angle_r_rot]), \
-               torch.FloatTensor(size_r)
+               angle_c, \
+               angle_r, \
+               angle_c_rot, \
+               angle_r_rot, \
+               torch.FloatTensor(size_r), \
+               torch.FloatTensor(velo), \
+               torch.FloatTensor(velo_rot), \
+               torch.LongTensor(velo_seg)
 
     def __len__(self):
         return len(self.points)
@@ -232,7 +261,7 @@ class myImageFloder(data.Dataset):
             left_img = processed(left_img)
             right_img = processed(right_img)
 
-            return left_img, right_img, dataL, name
+            return left_img, right_img, dataL, name, w, h
 
     def __len__(self):
         return len(self.left)
@@ -241,10 +270,10 @@ class myImageFloder(data.Dataset):
 if __name__ == '__main__':
     test_load = torch.utils.data.DataLoader(
         myPointData('obejct_data/data_object_image_2/training/frustum_points_train/', 1024, 12),
-        batch_size=1, shuffle=False, num_workers=8, drop_last=False)
+        batch_size=10, shuffle=False, num_workers=8, drop_last=False)
     for batch_idx, (
-    points, points_rot, seg_mask, box3d_center, box3d_center_rot, angle_c, angle_r, angle_c_rot, angle_r_rot,
-    size_r) in enumerate(test_load):
+            points, points_rot, seg_mask, box3d_center, box3d_center_rot, angle_c, angle_r, angle_c_rot, angle_r_rot,
+            size_r) in enumerate(test_load):
         print("batch:{}".format(batch_idx))
         print(points.shape)
         print(points_rot)
