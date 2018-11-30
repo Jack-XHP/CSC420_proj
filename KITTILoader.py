@@ -190,21 +190,10 @@ class myPointData(data.Dataset):
                angle_r, \
                angle_c_rot, \
                angle_r_rot, \
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> f9ca4c90e1fc9695698c83af6390e3c514a18276
                torch.FloatTensor(size_r), \
                torch.FloatTensor(velo), \
                torch.FloatTensor(velo_rot), \
                torch.LongTensor(velo_seg)
-<<<<<<< HEAD
-=======
-=======
-               torch.FloatTensor(size_r)
->>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
->>>>>>> f9ca4c90e1fc9695698c83af6390e3c514a18276
-
     def __len__(self):
         return len(self.points)
 
