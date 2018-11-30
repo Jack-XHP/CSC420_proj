@@ -23,6 +23,7 @@ current scripts:
     - get CNN disparity: python CNN_disparity --load_model <model path> --datapath <left and right image path>
 - Point Net source code : https://github.com/charlesq34/frustum-pointnets/blob/master/kitti/prepare_data.py
 - 3D Object proposal paper : https://arxiv.org/pdf/1608.07711.pdf
+- KITTI paper: http://www.cvlibs.net/publications/Geiger2013IJRR.pdf
 
 Obejct Data Format Description
 =======================

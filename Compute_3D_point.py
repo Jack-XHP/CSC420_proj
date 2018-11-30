@@ -6,6 +6,7 @@ from scipy.spatial import Delaunay
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
+
 class Voxel():
     def __init__(self, size):
         self.voxels = None
@@ -149,6 +150,7 @@ class Calib(object):
         self.b_x = self.P[0,3]/(-self.f_u) # relative
         self.b_y = self.P[1,3]/(-self.f_v)
 
+<<<<<<< HEAD
     def cart2hom(self, pts_3d):
         ''' Input: nx3 points in Cartesian
             Oupput: nx4 points in Homogeneous by pending 1
@@ -192,19 +194,29 @@ class Calib(object):
         return self.project_rect_to_image(pts_3d_rect)
 
     def project_image_to_rect(self, uv_depth):
+=======
+
+def project_image_to_rect(calib, uv_depth):
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
         ''' Input: nx3 first two channels are uv, 3rd channel
                    is depth in rect camera coord.
             Output: nx3 points in rect camera coord.
         '''
         n = uv_depth.shape[0]
+<<<<<<< HEAD
         x = ((uv_depth[:,0]-self.c_u)*uv_depth[:,2])/self.f_u + self.b_x
         y = ((uv_depth[:,1]-self.c_v)*uv_depth[:,2])/self.f_v + self.b_y
+=======
+        x = ((uv_depth[:,0]-calib.c_u)*uv_depth[:,2])/calib.f_u + calib.b_x
+        y = ((uv_depth[:,1]-calib.c_v)*uv_depth[:,2])/calib.f_v + calib.b_y
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
         pts_3d_rect = np.zeros((n,3))
         pts_3d_rect[:,0] = x
         pts_3d_rect[:,1] = y
         pts_3d_rect[:,2] = uv_depth[:,2]
         return pts_3d_rect
 
+<<<<<<< HEAD
 
 def get_lidar_in_image_fov(pc_velo, calib, xmin, ymin, xmax, ymax,
                            return_more=False, clip_distance=2.0):
@@ -234,11 +246,19 @@ def extract_frustum(path, points, img_id, index, point_dir, num_points, perturb_
     _, pc_image_coord, img_fov_inds = get_lidar_in_image_fov(scan[:, :3], calib, 0, 0, image_x, image_y, True)
     label_file = path + 'label_2/{}.txt'.format(img_id)
 
+=======
+
+def extract_frustum(path, points, img_id, index, point_dir, num_points, perturb_box2d=False, augmentX=1):
+    calib_path = path + 'calib/{}.txt'.format(img_id)
+    calib = Calib(calib_path)
+    label_file = path + 'label_2/{}.txt'.format(img_id)
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
     if os.path.isfile(label_file):
         objects = read_label(label_file)
     else:
         box_file = path + 'box/{}.txt'.format(img_id)
         objects = read_2d_box(box_file)
+<<<<<<< HEAD
 
     points = calib.project_image_to_rect(points.reshape(-1, 3)).reshape(image_y, image_x, 3)
     points_t = points.reshape(-1, 3)
@@ -255,6 +275,11 @@ def extract_frustum(path, points, img_id, index, point_dir, num_points, perturb_
     plt.show()
     return index, []
 
+=======
+    image_x = points.shape[1]
+    image_y = points.shape[0]
+    points = project_image_to_rect(calib, points.reshape(-1, 3)).reshape(image_y, image_x, 3)
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
     for obj_idx in range(len(objects)):
         # 2D BOX: Get pts rect backprojected
         obj = objects[obj_idx]
@@ -276,6 +301,7 @@ def extract_frustum(path, points, img_id, index, point_dir, num_points, perturb_
             xmax = min(image_x-1, xmax)
             ymin = max(0, ymin)
             ymax = min(image_y-1, ymax)
+<<<<<<< HEAD
 
             if ymax - ymin < 25 or xmax < xmin :
                 continue
@@ -290,6 +316,21 @@ def extract_frustum(path, points, img_id, index, point_dir, num_points, perturb_
             point_2d = point_2d.reshape((-1, 3))
 
 
+=======
+            point_2d = points[ymin: ymax + 1, xmin: xmax + 1]
+            while point_2d.size / 3 > 0.7 * num_points:
+                print(point_2d.shape)
+                point_2d = np.delete(point_2d, list(range(0, point_2d.shape[0], 8)), axis=0)
+                point_2d = np.delete(point_2d, list(range(0, point_2d.shape[1], 8)), axis=1)
+            point_2d = point_2d.reshape((-1, 3))
+            center_points = points[int(3 / 4.0 * ymin + ymax/4.0): int(3 / 4.0 * ymax + ymin/4.0) + 1, int(3 / 4.0 * xmin + xmax/4.0): int(3 / 4.0 * xmax + xmin/4.0) + 1]
+            while center_points.size / 3 > 0.7 * num_points:
+                print(center_points.shape)
+                center_points = np.delete(center_points, list(range(0, center_points.shape[0], 8)), axis=0)
+                center_points = np.delete(center_points, list(range(0, center_points.shape[1], 8)), axis=1)
+            center_points = center_points.reshape((-1, 3))
+            point_2d = np.vstack((point_2d, center_points))
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
             box2d_corner = np.array([xmin, ymin, xmax, ymax])
             box2d_center = np.array([(xmin + xmax) / 2.0, (ymin + ymax) / 2.0]).astype(int)
 
@@ -298,10 +339,17 @@ def extract_frustum(path, points, img_id, index, point_dir, num_points, perturb_
             if np.all(obj.t == 0):
                 obj.t = center
             box3d_corner = compute_box_3d(obj)
+<<<<<<< HEAD
             print(box3d_corner)
+=======
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
             box3d_center = obj.t
             box3d_size = np.array([obj.l, obj.w, obj.h])
             _, inds = extract_pc_in_box3d(point_2d, box3d_corner)
+            print(inds.sum())
+            if inds.sum() < 1:
+                print("skip")
+                continue
             label = np.zeros(point_2d.shape[0])
             label[inds] = 1
             print(label.sum())
@@ -377,10 +425,15 @@ if __name__ == '__main__':
     box3d_count = []
     for img in os.listdir(dir):
         img_id = img.split('.')[0]
+<<<<<<< HEAD
 
         points = find_3d_point(dir + img)
         if int(img_id) < 700:
 
+=======
+        print(img_id)
+        if int(img_id) < 600:
+>>>>>>> e8b96137bc6f28c671e46343aa6b0540a27e1356
             train_index, box_count = extract_frustum(path,points, img_id, train_index, point_train, 1024, perturb_box2d=True,
                                                      augmentX=5)
             box3d_count = box3d_count + box_count
