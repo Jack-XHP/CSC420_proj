@@ -14,8 +14,8 @@ __imagenet_stats = {'mean': [0.485, 0.456, 0.406],
                     'std': [0.229, 0.224, 0.225]}
 
 __box_mean = [3.996132075471698908e+00,
-1.617452830188679469e+00,
-1.517264150943395506e+00]
+              1.617452830188679469e+00,
+              1.517264150943395506e+00]
 
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',
@@ -137,6 +137,7 @@ class myPointData(data.Dataset):
     def __getitem__(self, index):
         point = self.points[index]
         datas = point_loader(point)
+        img_id = datas['img_id']
         rot_angle = np.pi / 2 + datas['frustum_angle']
         if self.lidar:
             points = datas['point_velo']
@@ -160,19 +161,17 @@ class myPointData(data.Dataset):
         if self.random_flip:
             # note: rot_angle won't be correct if we have random_flip
             # so do not use it in case of random flipping.
-            if np.random.random()>0.5: # 50% chance flipping
-                points[:,0] *= -1
+            if np.random.random() > 0.5:  # 50% chance flipping
+                points[:, 0] *= -1
                 box3d_center[0] *= -1
                 head = np.pi - head
 
         if self.random_shift:
-            dist = np.sqrt(np.sum(box3d_center[0]**2+box3d_center[1]**2))
-            shift = np.clip(np.random.randn()*dist*0.05, dist*0.8, dist*1.2)
-            points[:,2] += shift
+            dist = np.sqrt(np.sum(box3d_center[0] ** 2 + box3d_center[1] ** 2))
+            shift = np.clip(np.random.randn() * dist * 0.05, dist * 0.8, dist * 1.2)
+            points[:, 2] += shift
             box3d_center[2] += shift
 
-        # convert heading to 12 classes and residual
-        angle_c, angle_r = angle2class(head, self.num_angle)
         # convert 3d box size to mean + residual
         size_r = size2class(datas['box3d_size'])
 
@@ -188,6 +187,8 @@ class myPointData(data.Dataset):
                angle_r_rot, \
                torch.FloatTensor(size_r), \
                rot_angle, \
+               img_id, \
+               point.split('/')[-1]
 
     def __len__(self):
         return len(self.points)
