@@ -176,3 +176,7 @@ code/lm_module/data/*
 *.npy
 ssd_mobilenet_v1_coco_2017_11_17.tar.gz
 ssd_mobilenet_v1_coco_2017_11_17/
+
+part1yolo/det/*
+part1yolo/out_box/*
+yolov3.weights
