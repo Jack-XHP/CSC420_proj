@@ -13,9 +13,13 @@ Require packages:
 
 current scripts:
 ==========
-- get CNN disparity: python CNN_disparity.py --loadmodel finetune_300.tar --datapath obejct_data/data_object_image_2/training/
+- get CNN disparity: python CNN_disparity.py --loadmodel [model] --datapath [data folder]
 - get FRCNN 2d boxes: python Get_2D_Box.py
-- get Point Net prepared data: python Compute_3D_point.py
+- get Point Net prepared data: python Compute_3D_point.py --datapath [data folder]
+- get Frsutum points plot: python Compute_3D_point.py --datapath [data folder] --demo True
+- train Point net with disparity points: python Point2Box.py --datapath [data folder]
+- train Point net with Lidar points: python Point2Box.py --datapath [data folder] --uselidar True
+- get Point net result: python Point2Box.py --datapath [data folder] --uselidar [T/F] --loadmodel [model]
 - HHA source code : https://github.com/ZhangMenghe/rgbd-processor-python
 - PSMnet source code : https://github.com/JiaRenChang/PSMNet/
     - run command for PSMnet:

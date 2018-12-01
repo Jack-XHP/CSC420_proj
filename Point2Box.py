@@ -423,6 +423,11 @@ def main():
 
     optimizer = optim.Adam(model.parameters(), lr=0.002)
 
+    if args.uselidar:
+        name = "Lidar"
+    else:
+        name = "Disp"
+
     best_IOU = 0
     best_epoch = 0
     training_loss = []
@@ -456,16 +461,16 @@ def main():
 
         print("Best >0.4 IOU epoch {}, {}%".format(best_epoch, best_IOU))
 
-        savefilename = args.savemodel + 'PointNetLidar' + str(epoch) + '.tar'
+        savefilename = args.savemodel + 'PointNet' + name + str(epoch) + '.tar'
         torch.save({
             'epoch': epoch,
             'state_dict': model.state_dict()
         }, savefilename)
 
-    np.save('lidar_train_loss', np.array(training_loss))
-    np.save('lidar_test_loss', np.array(test_loss))
-    np.save('lidar_test_avg_iou', np.array(test_avg_iou))
-    np.save('lidar_test_percent_iou', np.array(test_percent_iou))
+    np.save(name + '_train_loss', np.array(training_loss))
+    np.save(name + '_test_loss', np.array(test_loss))
+    np.save(name + '_test_avg_iou', np.array(test_avg_iou))
+    np.save(name + '_test_percent_iou', np.array(test_percent_iou))
 
 
 def demo():
