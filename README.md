@@ -25,6 +25,11 @@ current scripts:
 - 3D Object proposal paper : https://arxiv.org/pdf/1608.07711.pdf
 - KITTI paper: http://www.cvlibs.net/publications/Geiger2013IJRR.pdf
 
+- get 2D box:  download yolov3.weights from here https://pjreddie.com/media/files/yolov3.weights
+put the weights file into part1yolo folder
+cd part1yolo
+pythonw detect.py --det det
+
 Obejct Data Format Description
 =======================
 
@@ -77,4 +82,3 @@ calib data we use:
   - px = 609.559300
   - py = 172.854000
   - T = 0.5327119288
-
