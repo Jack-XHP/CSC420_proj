@@ -125,32 +125,33 @@ def class2size(residual):
 
 
 class myPointData(data.Dataset):
-    def __init__(self, points_dir, num_point, num_angle, random_flip=False, random_shift=False):
+    def __init__(self, points_dir, num_point, num_angle, random_flip=False, random_shift=False, lidar=False):
         self.points = [points_dir + point for point in os.listdir(points_dir)]
         self.points = self.points
         self.num_point = num_point
         self.num_angle = num_angle
         self.random_flip = random_flip
         self.random_shift = random_shift
+        self.lidar = lidar
 
     def __getitem__(self, index):
         point = self.points[index]
         datas = point_loader(point)
         rot_angle = np.pi / 2 + datas['frustum_angle']
-        points = datas['point_2d']
-        velo = datas['point_velo']
+        if self.lidar:
+            points = datas['point_velo']
+            seg_mask = datas['velo_label']
+        else:
+            points = datas['point_2d']
+            seg_mask = datas['label']
+
         # sampling n points from whole point cloud
         choice = np.random.choice(points.shape[0], self.num_point, replace=True)
         points = points[choice, :]
         # find the mask label for 3d points
-        seg_mask = datas['label'][choice]
-
-        choice = np.random.choice(velo.shape[0], self.num_point, replace=True)
-        velo = velo[choice, :]
-        velo_seg =datas['velo_label'][choice]
+        seg_mask = seg_mask[choice]
 
         # get 3d box center
-        box3d_corner = datas['box3d_corner']
         box3d_center = datas['box3d_center']
 
         head = datas['heading']
@@ -176,24 +177,18 @@ class myPointData(data.Dataset):
         size_r = size2class(datas['box3d_size'])
 
         # rotate points and boxes to center of frustum
-        velo_rot = rotate_pc_along_y(velo.copy(), rot_angle)
         points_rot = rotate_pc_along_y(points.copy(), rot_angle)
         box3d_center_rot = rotate_pc_along_y(np.expand_dims(box3d_center.copy(), 0), rot_angle).squeeze()
         angle_c_rot, angle_r_rot = angle2class(head - rot_angle, self.num_angle)
 
-        return torch.FloatTensor(points), \
-               torch.FloatTensor(points_rot), \
+        return torch.FloatTensor(points_rot), \
                torch.LongTensor(seg_mask), \
-               torch.FloatTensor(box3d_center), \
                torch.FloatTensor(box3d_center_rot), \
-               angle_c, \
-               angle_r, \
                angle_c_rot, \
                angle_r_rot, \
                torch.FloatTensor(size_r), \
-               torch.FloatTensor(velo), \
-               torch.FloatTensor(velo_rot), \
-               torch.LongTensor(velo_seg)
+               rot_angle, \
+
     def __len__(self):
         return len(self.points)
 

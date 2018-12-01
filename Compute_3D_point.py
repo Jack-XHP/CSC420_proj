@@ -4,7 +4,9 @@ import cv2 as cv
 from KITTIloader2015 import read_label, Object3d, read_2d_box
 from scipy.spatial import Delaunay
 from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 import matplotlib.pyplot as plt
+
 
 
 class Voxel():
@@ -31,18 +33,16 @@ class Voxel():
         self.free_space[occupancy_id[:, 0], occupancy_id[:, 1], occupancy_id[:, 2]] = 1
 
 
-def find_3d_point(disp_path):
-    f = 721.537700
-    T = 0.5327119288
+def find_3d_point(disp_path, calib):
+    T = 0.54
     disp = cv.imread(disp_path, 0)
-    depth = f * T / disp
+    depth = calib.f_u * T / disp + 9.0
     index = np.indices(disp.shape)
     x = index[1]
     y = index[0]
     points = np.vstack((x.flatten(), y.flatten(), depth.flatten())).T
-    mask = depth.flatten() > 100
-    points[mask, ...] = np.zeros(3)
-    return points.reshape((disp.shape[0], disp.shape[1], 3))
+    points = points.reshape((disp.shape[0], disp.shape[1], 3))
+    return points
 
 
 def random_shift_box2d(box2d, shift_ratio=0.1):
@@ -222,18 +222,25 @@ def get_lidar_in_image_fov(pc_velo, calib, xmin, ymin, xmax, ymax,
         return imgfov_pc_velo
 
 
-def extract_frustum(path, points, img_id, index, point_dir, num_points, perturb_box2d=False, augmentX=1):
-    image_y = points.shape[1]
-    image_x = points.shape[0]
+def extract_frustum(path, img_id, index, point_dir, num_points, perturb_box2d=False, augmentX=1, demo=False):
+
 
     calib_path = path + 'calib/{}.txt'.format(img_id)
     calib = Calib(calib_path)
+
+    disp_path = path + 'CNN_depth/{}.png'.format(img_id)
+    points = find_3d_point(disp_path, calib)
+
+    image_x = points.shape[1]
+    image_y = points.shape[0]
+
 
     velo_path = path + 'velodyne/{}.bin'.format(img_id)
     scan = np.fromfile(velo_path, dtype=np.float32)
     scan = scan.reshape((-1, 4))
     velo_rect = calib.project_velo_to_rect(scan[:, :3])
     _, pc_image_coord, img_fov_inds = get_lidar_in_image_fov(scan[:, :3], calib, 0, 0, image_x, image_y, True)
+
     label_file = path + 'label_2/{}.txt'.format(img_id)
     if os.path.isfile(label_file):
         objects = read_label(label_file)
@@ -242,18 +249,6 @@ def extract_frustum(path, points, img_id, index, point_dir, num_points, perturb_
         objects = read_2d_box(box_file)
 
     points = calib.project_image_to_rect(points.reshape(-1, 3)).reshape(image_y, image_x, 3)
-    points_t = points.reshape(-1, 3)
-    points_t = points_t[points_t[:, 2] != 0, :]
-    choice = np.random.choice(points_t.shape[0], 5000, replace=True)
-    points_t = points_t[choice]
-    velo_rect_t = velo_rect[img_fov_inds, :]
-    print(points_t.shape)
-    print(velo_rect_t.shape)
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(points_t[:, 0].flatten(), points_t[:, 1].flatten(), points_t[:, 2].flatten(), c='r', marker='o')
-    ax.scatter(velo_rect_t[:, 0].flatten(), velo_rect_t[:, 1].flatten(), velo_rect_t[:, 2].flatten(), c='b', marker='^')
-    plt.show()
 
     for obj_idx in range(len(objects)):
         # 2D BOX: Get pts rect backprojected
@@ -279,13 +274,13 @@ def extract_frustum(path, points, img_id, index, point_dir, num_points, perturb_
 
             if ymax - ymin < 25 or xmax < xmin:
                 continue
+            print("2d box {}, {}, {}, {}".format(xmin, ymin, xmax, ymax))
 
             box_fov_inds = (pc_image_coord[:, 0] < xmax) & (pc_image_coord[:, 0] >= xmin) & (
                         pc_image_coord[:, 1] < ymax) & (pc_image_coord[:, 1] >= ymin)
 
             box_fov_inds = box_fov_inds & img_fov_inds
             velo_in_box_fov = velo_rect[box_fov_inds, :]
-            print(velo_in_box_fov.shape)
 
             point_2d = points[ymin: ymax + 1, xmin: xmax + 1]
             point_2d = point_2d.reshape((-1, 3))
@@ -293,32 +288,41 @@ def extract_frustum(path, points, img_id, index, point_dir, num_points, perturb_
             box2d_center = np.array([(xmin + xmax) / 2.0, (ymin + ymax) / 2.0]).astype(int)
 
             center = points[(box2d_center[1], box2d_center[0])]
+
             frustum_angle = -1 * np.arctan2(center[2], center[0])
+
             if np.all(obj.t == 0):
                 obj.t = center
+
             box3d_corner = compute_box_3d(obj)
-            print(box3d_corner)
+
             box3d_center = obj.t
             box3d_size = np.array([obj.l, obj.w, obj.h])
+
+            mask = point_2d[:, 2] < 100
+            point_2d = point_2d[mask, :]
+
             _, inds = extract_pc_in_box3d(point_2d, box3d_corner)
             label = np.zeros(point_2d.shape[0])
             label[inds] = 1
-            print(label.sum())
+
+            print("rgb points in box {}".format(label.sum()))
             if label.sum() == 0:
                 print("skip")
-            continue
+                continue
+
             _, velo_inds = extract_pc_in_box3d(velo_in_box_fov, box3d_corner)
             velo_label = np.zeros(velo_in_box_fov.shape[0])
             velo_label[velo_inds] = 1
-            print(velo_label.sum())
+            print("lidar points in box {}".format(velo_label.sum()))
             if velo_label.sum() == 0:
                 print("skip")
                 continue
+
             datas['img_id'] = img_id
             datas['point_2d'] = point_2d
             datas['point_velo'] = velo_in_box_fov
             datas['box2d_corner'] = box2d_corner
-            datas['box3d_corner'] = box3d_corner
             datas['box3d_center'] = box3d_center
             datas['box3d_size'] = box3d_size
             datas['frustum_angle'] = frustum_angle
@@ -328,8 +332,71 @@ def extract_frustum(path, points, img_id, index, point_dir, num_points, perturb_
             np.save(point_dir + str(index), datas)
             datas = {}
             index += 1
+
+            if demo:
+                box3d_corner_show = box3d_corner[:, [2, 0, 1]]
+                point_2d_show = point_2d[:, [2, 0, 1]]
+                velo_in_box_fov_show = velo_in_box_fov[:, [2, 0, 1]]
+                edges = [
+                    [box3d_corner_show[0], box3d_corner_show[1], box3d_corner_show[2], box3d_corner_show[3]],
+                    [box3d_corner_show[4], box3d_corner_show[5], box3d_corner_show[6], box3d_corner_show[7]],
+                    [box3d_corner_show[0], box3d_corner_show[1], box3d_corner_show[5], box3d_corner_show[4]],
+                    [box3d_corner_show[2], box3d_corner_show[3], box3d_corner_show[7], box3d_corner_show[6]],
+                    [box3d_corner_show[1], box3d_corner_show[2], box3d_corner_show[6], box3d_corner_show[5]],
+                    [box3d_corner_show[4], box3d_corner_show[7], box3d_corner_show[3], box3d_corner_show[0]],
+                    [box3d_corner_show[2], box3d_corner_show[3], box3d_corner_show[7], box3d_corner_show[6]]
+                ]
+
+                faces = Poly3DCollection(edges, linewidths=1, edgecolors='k')
+                faces.set_facecolor((0, 0, 1, 0.1))
+
+                mask = point_2d[:, 2].flatten() < 50
+                points_t = point_2d_show[mask, :]
+                fig = plt.figure()
+                ax = fig.add_subplot(111, projection='3d')
+                ax.add_collection3d(faces)
+                ax.scatter(points_t[:, 0].flatten(), points_t[:, 1].flatten(), points_t[:, 2].flatten(), c='r',
+                           marker='o')
+                ax.scatter(velo_in_box_fov_show[:, 0].flatten(), velo_in_box_fov_show[:, 1].flatten(),
+                           velo_in_box_fov_show[:, 2].flatten(), c='b',
+                           marker='^')
+                ax.invert_zaxis()
+                ax.set_xlabel('Z')
+                ax.set_ylabel('X')
+                ax.set_zlabel('Y')
+                plt.show()
+
         if box3d_size is not None:
             box3d_count.append(box3d_size)
+
+    if demo:
+        pointsk = points[0, 0:600].reshape(-1, 3)
+        pointsk = calib.project_rect_to_image(pointsk)
+        plt.scatter(pointsk[:, 0], pointsk[:, 1])
+        plt.show()
+        print(points.shape)
+        p = [(points[:150, :600].reshape(-1, 3), 'r'), (points[150:, :600].reshape(-1, 3), 'b'),
+             (points[:150, 600:].reshape(-1, 3), 'g'), (points[150:, 600:].reshape(-1, 3), 'm')]
+        velo_rect_t = velo_rect[img_fov_inds, :]
+        velo_rect_t = velo_rect_t[:, [2, 0, 1]]
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        for k in p:
+            points_t = k[0]
+            print(points_t.shape)
+            c = k[1]
+            choice = np.random.choice(points_t.shape[0], 1500, replace=True)
+            points_t = points_t[choice]
+            points_t = points_t[:, [2, 0, 1]]
+            ax.scatter(points_t[:, 0].flatten(), points_t[:, 1].flatten(), points_t[:, 2].flatten(), c=c, marker='o')
+        ax.scatter(velo_rect_t[:, 0].flatten(), velo_rect_t[:, 1].flatten(), velo_rect_t[:, 2].flatten(), c='y',
+                   marker='^')
+        ax.invert_zaxis()
+        ax.set_xlabel('Z')
+        ax.set_ylabel('X')
+        ax.set_zlabel('Y')
+        plt.show()
+
     return index, box3d_count
 
 
@@ -360,7 +427,7 @@ def sampleFromMask_2(distribution, points, num_points):
 
 
 if __name__ == '__main__':
-    path = 'obejct_data/data_object_image_2/training/'
+    path = 'training/'
     dir = path + 'CNN_depth/'
     point_train = path + 'frustum_points_train/'
     point_val = path + 'frustum_points_val/'
@@ -373,14 +440,13 @@ if __name__ == '__main__':
     box3d_count = []
     for img in os.listdir(dir):
         img_id = img.split('.')[0]
-        points = find_3d_point(dir + img)
-        if int(img_id) < 700:
-            train_index, box_count = extract_frustum(path, points, img_id, train_index, point_train, 1024,
+        if int(img_id) < 5000:
+            train_index, box_count = extract_frustum(path, img_id, train_index, point_train, 1024,
                                                      perturb_box2d=True,
-                                                     augmentX=5)
+                                                     augmentX=1)
             box3d_count = box3d_count + box_count
         else:
-            val_index, box_count = extract_frustum(path, points, img_id, val_index, point_val, 1024,
+            val_index, box_count = extract_frustum(path, img_id, val_index, point_val, 1024,
                                                    perturb_box2d=False,
                                                    augmentX=1)
             box3d_count = box3d_count + box_count
