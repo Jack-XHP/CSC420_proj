@@ -13,6 +13,16 @@ Require packages:
 
 current scripts:
 ==========
+- get 2D box (yolov3):  download yolov3.weights from here https://pjreddie.com/media/files/yolov3.weights
+Put the weights file into part1yolo folder
+cd part1yolo
+pythonw detect.py --det det
+
+- get 2D box (ssd): download ssd weights (ssd300_mAP_77.43_v2.pth) from here https://s3.amazonaws.com/amdegroot-models/ssd300_mAP_77.43_v2.pth
+Put the weights file into part1ssd folder
+cd part1ssd
+pythonw detect.py
+==========
 - get CNN disparity: python CNN_disparity.py --loadmodel finetune_300.tar --datapath obejct_data/data_object_image_2/training/
 - get FRCNN 2d boxes: python Get_2D_Box.py
 - get Point Net prepared data: python Compute_3D_point.py
@@ -25,10 +35,6 @@ current scripts:
 - 3D Object proposal paper : https://arxiv.org/pdf/1608.07711.pdf
 - KITTI paper: http://www.cvlibs.net/publications/Geiger2013IJRR.pdf
 
-- get 2D box:  download yolov3.weights from here https://pjreddie.com/media/files/yolov3.weights
-put the weights file into part1yolo folder
-cd part1yolo
-pythonw detect.py --det det
 
 Obejct Data Format Description
 =======================
