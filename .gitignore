@@ -180,3 +180,11 @@ ssd_mobilenet_v1_coco_2017_11_17/
 part1yolo/det/*
 part1yolo/out_box/*
 yolov3.weights
+
+part1ssd/temp/*
+part1ssd/out_box/*
+part1ssd/det/*
+ssd300_mAP_77.43_v2.pth
+
+part1faster-rcnn/*
+part1faster-rcnn2/*
