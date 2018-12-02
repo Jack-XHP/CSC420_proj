@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import argparse
 
 def roty(t):
     ''' Rotation about the y-axis. '''
@@ -78,13 +79,14 @@ def read_file_name(box3dcornerforlder):
 			result[n[0]] = [n[1]]
 	return result
 
-def main():
-	imgforlder = "./obejct_data/data_object_image_2/training/image_2/"
-	calibforder = "./obejct_data/data_object_image_2/training/calib/"
-	box3dcornerforlder = "./obejct_data/data_object_image_2/training/demo_result/"
-	save_folder = "./obejct_data/data_object_image_2/training/result_image/"
+def main(imgforlder,calibforder,box3dcornerforlder,savefolder):
+	# imgforlder = "./obejct_data/data_object_image_2/training/image_2/"
+	# calibforder = "./obejct_data/data_object_image_2/training/calib/"
+	# box3dcornerforlder = "./obejct_data/data_object_image_2/training/demo_result/"
+	# savefolder = "./obejct_data/data_object_image_2/training/result_image/"
 	dct = read_file_name(box3dcornerforlder)
-	imgsavefolder = ""
+	if not os.path.exists(savefolder):
+		os.mkdir(savefolder)
 	for imgid in dct.keys():
 		# print(imgid)
 		imgpath = imgforlder + imgid+".png"
@@ -106,7 +108,13 @@ def main():
 			# print(frustum_angle)
 			# print(points2d)
 			img = draw_projected_box3d(img,points2d)
-		saveBGR2RGB(img,save_folder+imgid+".png")
+		saveBGR2RGB(img,savefolder+imgid+".png")
 
 if __name__ == '__main__':
-	main()
+    parser = argparse.ArgumentParser(description='3D BOX projection')
+    parser.add_argument('--imgforlder', default="./obejct_data/data_object_image_2/training/image_2/")
+    parser.add_argument('--calibforder', default="./obejct_data/data_object_image_2/training/calib/")
+    parser.add_argument('--cornerforder', default="./obejct_data/data_object_image_2/training/demo_result/")
+    parser.add_argument('--savefolder', default="./obejct_data/data_object_image_2/training/result_image/")
+    args = parser.parse_args()
+    main(args.imgforlder,args.calibforder,args.cornerforder,args.savefolder)
