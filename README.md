@@ -11,6 +11,18 @@ Require packages:
 - opencv3.4.3
 - for detailed list of packages check requirement.txt
 
+current scripts for part1:
+==========
+- get 2D box (yolov3):  download yolov3.weights from here https://pjreddie.com/media/files/yolov3.weights
+Put the weights file into part1yolo folder
+cd part1yolo
+pythonw detect.py --det det
+
+- get 2D box (ssd): download ssd weights (ssd300_mAP_77.43_v2.pth) from here https://s3.amazonaws.com/amdegroot-models/ssd300_mAP_77.43_v2.pth
+Put the weights file into part1ssd folder
+cd part1ssd
+pythonw detect.py
+
 current scripts:
 ==========
 - get CNN disparity: python CNN_disparity.py --loadmodel [model] --datapath [data folder]
@@ -29,10 +41,6 @@ current scripts:
 - 3D Object proposal paper : https://arxiv.org/pdf/1608.07711.pdf
 - KITTI paper: http://www.cvlibs.net/publications/Geiger2013IJRR.pdf
 
-- get 2D box:  download yolov3.weights from here https://pjreddie.com/media/files/yolov3.weights
-put the weights file into part1yolo folder
-cd part1yolo
-pythonw detect.py --det det
 
 Obejct Data Format Description
 =======================
