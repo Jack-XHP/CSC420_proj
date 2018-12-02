@@ -265,7 +265,7 @@ if __name__ ==  '__main__':
         label = "{0}".format(classes[cls])
         # print(label)
 
-        out_box = x.numpy()[1:5]
+        out_box = x.cpu().numpy()[1:5]
         filename = filenames[int(x[0])]
         filename = filename.split("/")[-1]
         filename = filename.split("_")[-1]

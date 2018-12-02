@@ -111,6 +111,8 @@ def read_2d_box(box_file):
     objects = []
     empty_list = "Car 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
     for line in open(box_file):
+        if line.strip():
+            continue
         data = line.split('')
         new_obj = Object3d(empty_list)
         new_obj.type = 'Car'

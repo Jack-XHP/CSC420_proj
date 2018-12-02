@@ -33,7 +33,7 @@ def get_lidar_in_image_fov(pc_velo, calib, xmin, ymin, xmax, ymax,
         return imgfov_pc_velo
 
 
-def extract_frustum(path, img_id, index, point_dir, perturb_box2d=False, augmentX=1, demo=False):
+def extract_frustum(path, img_id, index, point_dir, perturb_box2d=False, augmentX=1, demo=False, no_label=True):
     calib_path = path + 'calib/{}.txt'.format(img_id)
     calib = Calib(calib_path)
 
@@ -51,18 +51,21 @@ def extract_frustum(path, img_id, index, point_dir, perturb_box2d=False, augment
     velo_rect = calib.project_velo_to_rect(scan[:, :3])
     _, pc_image_coord, img_fov_inds = get_lidar_in_image_fov(scan[:, :3], calib, 0, 0, image_x, image_y, True)
 
-    label_file = path + 'label_2/{}.txt'.format(img_id)
-    objects = read_label(label_file)
+    if not no_label:
+        label_file = path + 'label_2/{}.txt'.format(img_id)
+        objects = read_label(label_file)
+    else:
+        box_2d = path + 'out_box/{}.txt'.format(img_id)
+        objects = read_2d_box(box_2d)
 
+    box3d_count = []
     for obj_idx in range(len(objects)):
         # 2D BOX: Get pts rect backprojected
         obj = objects[obj_idx]
         box2d = obj.box2d
-        box3d_count = []
-        box3d_size = None
         if obj.type != 'Car':
             continue
-
+        box3d_size = None
         for i in range(augmentX):
             # Augment data by box2d perturbation
             if perturb_box2d:
@@ -160,14 +163,24 @@ if __name__ == '__main__':
     parser.add_argument('--datapath', default='obejct_data/data_object_image_2/training/', help='datapath')
     parser.add_argument('--demo', default=False, help='load model')
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed (default: 1)')
+    parser.add_argument('--trainsize', type=int, default=600, metavar='S', help='training images (default: 700)')
+    parser.add_argument('--nolabel', default=False, help='Use label file or 2d box')
     args = parser.parse_args()
     np.random.seed(args.seed)
     if args.demo:
         args.demo = True
+
+    if args.nolabel:
+        args.nolabel = True
+
     path = args.datapath
     dir = path + 'CNN_depth/'
     point_train = path + 'frustum_points_train/'
     point_val = path + 'frustum_points_val/'
+
+    if args.nolabel:
+        point_val = path + 'frustum_points_test/'
+
     if not os.path.exists(point_train):
         os.makedirs(point_train)
     if not os.path.exists(point_val):
@@ -177,12 +190,12 @@ if __name__ == '__main__':
     box3d_count = []
     for img in os.listdir(dir):
         img_id = img.split('.')[0]
-        if int(img_id) < 5500:
+        if int(img_id) < args.trainsize:
             train_index, box_count = extract_frustum(path, img_id, train_index, point_train, perturb_box2d=True,
-                                                     augmentX=2, demo=args.demo)
+                                                     augmentX=2, demo=args.demo, no_label=args.nolabel)
             box3d_count = box3d_count + box_count
         else:
             val_index, box_count = extract_frustum(path, img_id, val_index, point_val, perturb_box2d=False,
-                                                   augmentX=1, demo=args.demo)
+                                                   augmentX=1, demo=args.demo, no_label=args.nolabel)
             box3d_count = box3d_count + box_count
     np.savetxt('avg_box_size', np.mean(np.array(box3d_count), axis=0))
