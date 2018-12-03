@@ -29,19 +29,6 @@ class test_net(nn.Module):
         fwd = nn.Sequential(self.linear_1, self.middle, self.output)
         return fwd(x)
 
-# def get_test_input(input_dim, CUDA):
-#     img = cv2.imread("dog-cycle-car.png")
-#     img = cv2.resize(img, (input_dim, input_dim))
-#     img_ =  img[:,:,::-1].transpose((2,0,1))
-#     img_ = img_[np.newaxis,:,:,:]/255.0
-#     img_ = torch.from_numpy(img_).float()
-#     img_ = Variable(img_)
-#
-#     if CUDA:
-#         img_ = img_.cuda()
-#     num_classes
-#     return img_
-
 
 
 def arg_parse():
@@ -52,13 +39,18 @@ def arg_parse():
 
 
     parser = argparse.ArgumentParser(description='YOLO v3 Detection Module')
+    parser.add_mutually_exclusive_group(required=False)
 
+    parser.add_argument('--datapath', dest = 'datapath', default='obejct_data/data_object_image_2/training/', help='datapath')
     parser.add_argument("--images", dest = 'images', help =
                         "Image / Directory containing images to perform detection upon",
-                        default = '../obejct_data/data_object_image_2/training/image_2/', type = str)
+                        default = 'obejct_data/data_object_image_2/training/image_2/', type = str)
     parser.add_argument("--det", dest = 'det', help =
                         "Image / Directory to store detections to",
                         default = "det", type = str)
+    parser.add_argument('--draw-box', dest = 'draw_box', action='store_true')
+    parser.add_argument('--no-draw-box', dest = 'draw_box', action='store_false')
+    parser.set_defaults(draw_box=False)
     parser.add_argument("--bs", dest = "bs", help = "Batch size", default = 1)
     parser.add_argument("--confidence", dest = "confidence", help = "Object Confidence to filter predictions", default = 0.5)
     parser.add_argument("--nms_thresh", dest = "nms_thresh", help = "NMS Threshhold", default = 0.4)
@@ -81,28 +73,10 @@ if __name__ ==  '__main__':
 
     scales = args.scales
 
-
-#        scales = [int(x) for x in scales.split(',')]
-#
-#
-#
-#        args.reso = int(args.reso)
-#
-#        num_boxes = [args.reso//32, args.reso//16, args.reso//8]
-#        scale_indices = [3*(x**2) for x in num_boxes]
-#        scale_indices = list(itertools.accumulate(scale_indices, lambda x,y : x+y))
-#
-#
-#        li = []
-#        i = 0
-#        for scale in scale_indices:
-#            li.extend(list(range(i, scale)))
-#            i = scale
-#
-#        scale_indices = li
-
-    # images = args.images
-    images = '../obejct_data/data_object_image_2/training/image_2/'
+    parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + "/"
+    images = parent_folder + args.images
+    print(images)
+    out_box_dir = parent_folder + args.datapath + 'box_yolo'
     batch_size = int(args.bs)
     confidence = float(args.confidence)
     nms_thesh = float(args.nms_thresh)
@@ -273,7 +247,7 @@ if __name__ ==  '__main__':
         # print(out_box)
         # print(filename)
 
-        out_path = os.path.join("out_box", '{}.txt'.format(filename))
+        out_path = out_box_dir + '/{}.txt'.format(filename)
 
         append_write = 'w'
         if os.path.exists(out_path):
@@ -302,15 +276,15 @@ if __name__ ==  '__main__':
     det_names = pd.Series(imlist).apply(lambda x: "{}/det_{}".format(args.det,x.split("/")[-1]))
     # print(det_names)
 
-    out_box_dir = os.path.dirname(os.path.realpath(__file__)) + '/out_box'
+
     if os.path.exists(out_box_dir):
         shutil.rmtree(out_box_dir)
     os.makedirs(out_box_dir)
 
     list(map(lambda x: write(x, im_batches, orig_ims, det_names), output))
 
-
-    list(map(cv2.imwrite, det_names, orig_ims))
+    if args.draw_box:
+        list(map(cv2.imwrite, det_names, orig_ims))
 
     end = time.time()
 

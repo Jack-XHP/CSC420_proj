@@ -188,3 +188,6 @@ ssd300_mAP_77.43_v2.pth
 
 part1faster-rcnn/*
 part1faster-rcnn2/*
+part3_get_3d_points.py
+obejct_data/data_object_image_2/training/box_yolo/*
+obejct_data/data_object_image_2/training/box_ssd/*
