@@ -1,3 +1,8 @@
+"""
+Author: Haoping Xu
+adapted from https://github.com/charlesq34/frustum-pointnets
+"""
+
 from scipy.spatial import ConvexHull
 from scipy.spatial import Delaunay
 import numpy as np

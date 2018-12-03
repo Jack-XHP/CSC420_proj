@@ -1,4 +1,5 @@
 """
+Author: Haoping Xu
 adapted from https://github.com/JiaRenChang/PSMNet for
 "Pyramid Stereo Matching Network" paper (CVPR 2018) by Jia-Ren Chang and Yong-Sheng Chen.
 """
@@ -93,17 +94,6 @@ def angle2class(angle, num_class):
     return class_id, residual_angle
 
 
-def class2angle(pred_cls, residual, num_class, to_label_format=True):
-    ''' Inverse function to angle2class.
-    If to_label_format, adjust angle to the range as in labels.
-    '''
-    angle_per_class = 2 * np.pi / float(num_class)
-    angle_center = pred_cls * angle_per_class
-    angle = angle_center + residual
-    if to_label_format and angle > np.pi:
-        angle = angle - 2 * np.pi
-    return angle
-
 
 def size2class(size):
     ''' Convert 3D bounding box size to template class and residuals.
@@ -117,11 +107,6 @@ def size2class(size):
     size_residual = size - __box_mean
     return size_residual
 
-
-def class2size(residual):
-    ''' Inverse function to size2class. '''
-    mean_size = __box_mean
-    return mean_size + residual
 
 
 class myPointData(data.Dataset):
@@ -260,22 +245,3 @@ class myImageFloder(data.Dataset):
 
     def __len__(self):
         return len(self.left)
-
-
-if __name__ == '__main__':
-    test_load = torch.utils.data.DataLoader(
-        myPointData('obejct_data/data_object_image_2/training/frustum_points_train/', 1024, 12),
-        batch_size=10, shuffle=False, num_workers=8, drop_last=False)
-    for batch_idx, (
-            points, points_rot, seg_mask, box3d_center, box3d_center_rot, angle_c, angle_r, angle_c_rot, angle_r_rot,
-            size_r) in enumerate(test_load):
-        print("batch:{}".format(batch_idx))
-        print(points.shape)
-        print(points_rot)
-        print(box3d_center)
-        print(box3d_center_rot)
-        print(angle_c)
-        print(angle_r)
-        print(angle_c_rot)
-        print(angle_r_rot)
-        print(size_r)

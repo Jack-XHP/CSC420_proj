@@ -1,3 +1,7 @@
+"""
+Author: Haoping Xu
+"""
+
 import numpy as np
 import os
 import cv2 as cv
@@ -8,6 +12,9 @@ from Box_util import random_shift_box2d, compute_box_3d, extract_pc_in_box3d
 
 
 def find_3d_point(disp_path, calib):
+    '''
+    Using disparity and calibration, find depth for each pixel
+    '''
     T = 0.54
     disp = cv.imread(disp_path, 0)
     depth = calib.f_u * T / disp + 9.0
@@ -34,23 +41,34 @@ def get_lidar_in_image_fov(pc_velo, calib, xmin, ymin, xmax, ymax,
 
 
 def extract_frustum(path, img_id, index, point_dir, perturb_box2d=False, augmentX=1, demo=False, no_label=True):
+    '''
+    Extract all 3D points within a 2D box frustum, both from stereo iamge and lidar. Rotate them from
+    rectified coordinate to frustum coordinate. And use the ground truth 3D box to make a mask of points
+    with in the box
+    '''
+
+    # read calibration file
     calib_path = path + 'calib/{}.txt'.format(img_id)
     calib = Calib(calib_path)
 
+    # get disparity info
     disp_path = path + 'CNN_depth/{}.png'.format(img_id)
     points_raw = find_3d_point(disp_path, calib)
 
     image_x = points_raw.shape[1]
     image_y = points_raw.shape[0]
 
+    # compute U, V , depth from disparity
     points = calib.project_image_to_rect(points_raw.reshape(-1, 3)).reshape(image_y, image_x, 3)
 
+    # get lidar point clouds within the image FOV
     velo_path = path + 'velodyne/{}.bin'.format(img_id)
     scan = np.fromfile(velo_path, dtype=np.float32)
     scan = scan.reshape((-1, 4))
     velo_rect = calib.project_velo_to_rect(scan[:, :3])
     _, pc_image_coord, img_fov_inds = get_lidar_in_image_fov(scan[:, :3], calib, 0, 0, image_x, image_y, True)
 
+    # get 2D box and other labels
     if not no_label:
         label_file = path + 'label_2/{}.txt'.format(img_id)
         objects = read_label(label_file)
@@ -80,24 +98,31 @@ def extract_frustum(path, img_id, index, point_dir, perturb_box2d=False, augment
 
             if ymax - ymin < 25 or xmax < xmin:
                 continue
-            print("2d box {}, {}, {}, {}".format(xmin, ymin, xmax, ymax))
 
+            # get lidar points in 2D box's frustum
             box_fov_inds = (pc_image_coord[:, 0] < xmax) & (pc_image_coord[:, 0] >= xmin) & (
                     pc_image_coord[:, 1] < ymax) & (pc_image_coord[:, 1] >= ymin)
 
             box_fov_inds = box_fov_inds & img_fov_inds
             velo_in_box_fov = velo_rect[box_fov_inds, :]
 
+            # get UVDepth points within 2D box
             point_2d = points_raw[ymin: ymax + 1, xmin: xmax + 1]
             point_2d = point_2d.reshape((-1, 3))
+
+            # remove points from background
             mask = point_2d[:, 2] < 100
             point_2d = point_2d[mask, :]
+
+            # calibrate depth using lidar info
             depth_shift = np.mean(velo_in_box_fov[:, 2]) - np.mean(point_2d[:, 2])
-            print("depth shift = {}".format(depth_shift))
             point_2d[:, 2] += depth_shift
+
+            # get corresponding 3D points in rectified coordinate
             point_2d = calib.project_image_to_rect(point_2d)
+
+            # calibrate points with lidar point center
             center_shift = np.mean(velo_in_box_fov, axis=0) - np.mean(point_2d, axis=0)
-            print("center shift = {}".format(center_shift))
             point_2d += center_shift
 
             box2d_corner = np.array([xmin, ymin, xmax, ymax])
@@ -115,18 +140,23 @@ def extract_frustum(path, img_id, index, point_dir, perturb_box2d=False, augment
             box3d_center = obj.t
             box3d_size = np.array([obj.l, obj.w, obj.h])
 
+            # find points within 3D box
             _, inds = extract_pc_in_box3d(point_2d, box3d_corner)
             label = np.zeros(point_2d.shape[0])
             label[inds] = 1
 
+            # filter frustum with no points in 3D box
             print("rgb points in box {}".format(label.sum()))
             if label.sum() == 0:
                 print("skip")
                 continue
 
+            # find points within 3D box
             _, velo_inds = extract_pc_in_box3d(velo_in_box_fov, box3d_corner)
             velo_label = np.zeros(velo_in_box_fov.shape[0])
             velo_label[velo_inds] = 1
+
+            # filter frustum with no points in 3D box
             print("lidar points in box {}".format(velo_label.sum()))
             if velo_label.sum() == 0:
                 print("skip")

@@ -5,6 +5,7 @@ from numpy.linalg import inv
 from scipy.linalg import *
 # from sympy import Matrix
 import math
+
 def detect(img,template,pat):
 	res = cv2.matchTemplate(img,template,cv2.TM_CCORR_NORMED)
 	min_val , max_val , min_loc , max_loc = cv2.minMaxLoc(res)

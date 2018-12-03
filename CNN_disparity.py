@@ -1,4 +1,5 @@
 """
+Author: Haoping Xu
 adapted from https://github.com/JiaRenChang/PSMNet for
 "Pyramid Stereo Matching Network" paper (CVPR 2018) by Jia-Ren Chang and Yong-Sheng Chen.
 """
@@ -301,8 +302,6 @@ def result(imgL, imgR, w, h, name):
         newimg = cv.resize(pred_disp[0], (int(w[0]),int(h[0])))
     else:
         newimg = np.pad(pred_disp[0], ((h[0]-368, 0), (w[0]-1232,0)), 'edge')
-    print(newimg.shape)
-    print(w[0],h[0])
     plt.imsave(args.datapath+'CNN_depth/'+name[0],newimg, cmap='gray')
 
 def adjust_learning_rate(optimizer, epoch):
@@ -415,7 +414,6 @@ if __name__ == '__main__':
         if not os.path.exists(directory):
             os.makedirs(directory)
         for batch_idx, (imgL, imgR, disp_L, name, w, h) in enumerate(ResultImgLoader):
-            print(imgL.size())
             result(imgL, imgR, w, h, name)
     else:
         main()

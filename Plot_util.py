@@ -1,3 +1,6 @@
+"""
+Author: Haoping Xu
+"""
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 import matplotlib.pyplot as plt
@@ -31,6 +34,10 @@ def set_axes_equal(ax):
 
 
 def plot_frsutum(box3d_corner, point_2d, velo_in_box_fov):
+    '''
+    Plot all the 3D points and lidar points cloud of a frustum of a 2D box in a image in a rectified coordinate
+    and show the ground truth 3D box
+    '''
     box3d_corner_show = box3d_corner[:, [2, 0, 1]]
     point_2d_show = point_2d[:, [2, 0, 1]]
     velo_in_box_fov_show = velo_in_box_fov[:, [2, 0, 1]]
@@ -68,6 +75,9 @@ def plot_frsutum(box3d_corner, point_2d, velo_in_box_fov):
 
 
 def plot_all(points, image_y, image_x, calib, velo_rect_t):
+    '''
+    Plot all the 3D points and lidar points cloud of a image in a rectified coordinate
+    '''
     points = points.reshape(-1, 3)
     points[points[:, 2] > 1000] = np.zeros(3)
     points = points.reshape(image_y, image_x, 3)
@@ -99,3 +109,42 @@ def plot_all(points, image_y, image_x, calib, velo_rect_t):
     ax.set_aspect('equal')
     set_axes_equal(ax)
     plt.show()
+
+
+def plot_training_curve():
+    lidar_test_loss = np.load("Lidar_test_loss.npy")
+    lidar_train_loss = np.load("Lidar_train_loss.npy")
+    lidar_avg_iou = np.load("Lidar_test_avg_iou.npy")
+    lidar_percent_iou = np.load("Lidar_test_percent_iou.npy")
+    Disp_test_loss = np.load("Disp_test_loss.npy")
+    Disp_train_loss = np.load("Disp_train_loss.npy")
+    Disp_avg_iou = np.load("Disp_test_avg_iou.npy")
+    Disp_percent_iou = np.load("Disp_test_percent_iou.npy")
+    epochs = np.arange(300)
+
+    plt.plot(epochs, lidar_train_loss, color='r', label='lidar train loss')
+    plt.plot(epochs, lidar_test_loss, color='y', label='lidar test loss')
+    plt.plot(epochs, Disp_train_loss, color='g', label='disparity train loss')
+    plt.plot(epochs, Disp_test_loss, color='b', label='disparity test loss')
+    plt.xlabel("epoch")
+    plt.ylabel("loss")
+    plt.legend()
+    plt.show()
+
+    plt.plot(epochs, lidar_avg_iou, color='r', label='lidar avg IOU')
+    plt.plot(epochs, Disp_avg_iou, color='b', label='disparity avg IOU')
+    plt.xlabel("epoch")
+    plt.ylabel('IOU')
+    plt.legend()
+    plt.show()
+
+    plt.plot(epochs, lidar_percent_iou, color='r', label='lidar % IOU > 0.4')
+    plt.plot(epochs, Disp_percent_iou, color='b', label='disparity % IOU > 0.4')
+    plt.xlabel("epoch")
+    plt.ylabel('%')
+    plt.legend()
+    plt.show()
+
+
+if __name__ == '__main__':
+    plot_training_curve()

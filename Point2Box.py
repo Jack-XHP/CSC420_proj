@@ -1,3 +1,6 @@
+"""
+Author: Haoping Xu
+"""
 import argparse
 import torch
 import torch.nn as nn
@@ -474,7 +477,7 @@ def main():
 
 
 def demo():
-    demo_data = DA.myPointData(args.datapath + 'frustum_points_demo/', 1048, 12, lidar=args.uselidar)
+    demo_data = DA.myPointData(args.datapath + 'frustum_points_val/', 1048, 12, lidar=args.uselidar)
     demo_load = torch.utils.data.DataLoader(demo_data, batch_size=100, shuffle=False, num_workers=8, drop_last=False)
     save_dir = args.datapath + 'demo_result/'
     if not os.path.exists(save_dir):
