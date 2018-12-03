@@ -68,9 +68,9 @@ def object_detect(img, out_box_dir, draw_box, out_img_dir):
             # coords = (pt[0], pt[1]), pt[2]-pt[0]+1, pt[3]-pt[1]+1
             # color = colors[i]
             color = (255, 0, 0)
-            cv2.rectangle(rgb_image, (pt[0], pt[1]), (pt[2], pt[3]), color, 1)
+            cv2.rectangle(rgb_image, (pt[0], pt[1]), (pt[2], pt[3]), color, 2)
             t_size = cv2.getTextSize(label_name, cv2.FONT_HERSHEY_PLAIN, 1 , 1)[0]
-            cv2.putText(rgb_image, label_name, (int(pt[0]), int(pt[1]) + t_size[1] + 4), cv2.FONT_HERSHEY_PLAIN, 1, [225,255,255], 1)
+            cv2.putText(rgb_image, label_name, (int(pt[0]), int(pt[1]) + t_size[1] + 4), cv2.FONT_HERSHEY_PLAIN, 2, [225,255,255], 1)
 
             # currentAxis.add_patch(plt.Rectangle(*coords, fill=False, edgecolor=color, linewidth=2))
             # currentAxis.text(pt[0], pt[1], display_txt, bbox={'facecolor':color, 'alpha':0.5})
@@ -80,7 +80,8 @@ def object_detect(img, out_box_dir, draw_box, out_img_dir):
 
     if draw_box:
         # print(filename)
-        draw_path = out_img_dir + '/det_{}.jpg'.format(filename)
+        draw_path = out_img_dir + '/det_{}.png'.format(filename)
+        rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
         cv2.imwrite(draw_path, rgb_image)
 
     out_path = out_box_dir + '/{}.txt'.format(filename)

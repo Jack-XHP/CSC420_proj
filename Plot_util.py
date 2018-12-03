@@ -38,9 +38,9 @@ def plot_frsutum(box3d_corner, point_2d, velo_in_box_fov):
     Plot all the 3D points and lidar points cloud of a frustum of a 2D box in a image in a rectified coordinate
     and show the ground truth 3D box
     '''
-    box3d_corner_show = box3d_corner[:, [2, 0, 1]]
-    point_2d_show = point_2d[:, [2, 0, 1]]
-    velo_in_box_fov_show = velo_in_box_fov[:, [2, 0, 1]]
+    box3d_corner_show = box3d_corner[:, [2, 0, 1]] * np.array([1, -1, -1])
+    point_2d_show = point_2d[:, [2, 0, 1]] * np.array([1, -1, -1])
+    velo_in_box_fov_show = velo_in_box_fov[:, [2, 0, 1]]* np.array([1, -1, -1])
     edges = [
         [box3d_corner_show[0], box3d_corner_show[1], box3d_corner_show[2], box3d_corner_show[3]],
         [box3d_corner_show[4], box3d_corner_show[5], box3d_corner_show[6], box3d_corner_show[7]],
@@ -61,11 +61,11 @@ def plot_frsutum(box3d_corner, point_2d, velo_in_box_fov):
     ax.set_aspect('equal')
     ax.add_collection3d(faces)
     ax.scatter(points_t[:, 0].flatten(), points_t[:, 1].flatten(), points_t[:, 2].flatten(), c='r',
-               marker='o')
+               marker='o', label='camera points')
     ax.scatter(velo_in_box_fov_show[:, 0].flatten(), velo_in_box_fov_show[:, 1].flatten(),
                velo_in_box_fov_show[:, 2].flatten(), c='b',
-               marker='^')
-    ax.invert_zaxis()
+               marker='^', label='lidar points')
+    ax.legend()
     ax.set_xlabel('Z')
     ax.set_ylabel('X')
     ax.set_zlabel('Y')
@@ -96,12 +96,10 @@ def plot_all(points, image_y, image_x, calib, velo_rect_t):
         points_t = k[0]
         print(points_t.shape)
         c = k[1]
-        choice = np.random.choice(points_t.shape[0], 1500, replace=True)
-        points_t = points_t[choice]
         points_t = points_t[:, [2, 0, 1]]
-        ax.scatter(points_t[:, 0].flatten(), points_t[:, 1].flatten(), points_t[:, 2].flatten(), c=c, marker='o')
-    ax.scatter(velo_rect_t[:, 0].flatten(), velo_rect_t[:, 1].flatten(), velo_rect_t[:, 2].flatten(), c='y', marker='^')
-    ax.invert_zaxis()
+        ax.scatter(points_t[:, 0].flatten(), points_t[:, 1].flatten(), points_t[:, 2].flatten(), c=c, marker='o', label='camera points')
+    ax.scatter(velo_rect_t[:, 0].flatten(), velo_rect_t[:, 1].flatten(), velo_rect_t[:, 2].flatten(), c='y', marker='^', label='lidar points')
+    ax.legend()
     ax.set_xlabel('Z')
     ax.set_ylabel('X')
     ax.set_zlabel('Y')
@@ -148,3 +146,6 @@ def plot_training_curve():
 
 if __name__ == '__main__':
     plot_training_curve()
+    iamge = plt.imread("training/image_2/007353.png")
+    plt.imshow(iamge[188:265 , 269:421])
+    plt.show()

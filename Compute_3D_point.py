@@ -76,12 +76,13 @@ def extract_frustum(path, img_id, index, point_dir, perturb_box2d=False, augment
     else:
         box_2d = path + 'box_ssd/{}.txt'.format(img_id)
         objects = read_2d_box(box_2d)
-
+    print(img_id)
     box3d_count = []
     for obj_idx in range(len(objects)):
         # 2D BOX: Get pts rect backprojected
         obj = objects[obj_idx]
         box2d = obj.box2d
+        print(box2d)
         if obj.type != 'Car':
             continue
         box3d_size = None
@@ -117,6 +118,9 @@ def extract_frustum(path, img_id, index, point_dir, perturb_box2d=False, augment
             # remove points from background
             mask = point_2d[:, 2] < 100
             point_2d = point_2d[mask, :]
+
+            if mask.sum() == 0:
+                continue
 
             # calibrate depth using lidar info
             depth_shift = np.mean(velo_in_box_fov[:, 2]) - np.mean(point_2d[:, 2])
@@ -190,7 +194,7 @@ def extract_frustum(path, img_id, index, point_dir, perturb_box2d=False, augment
         if box3d_size is not None:
             box3d_count.append(box3d_size)
 
-    if demo:
+    if False:
         plot_all(points, image_y, image_x, calib, velo_rect[img_fov_inds, :])
 
     return index, box3d_count
@@ -229,12 +233,12 @@ if __name__ == '__main__':
     box3d_count = []
     for img in os.listdir(dir):
         img_id = img.split('.')[0]
-        shutil.copy(path + 'calib/0007.txt', path+"calib/{}.txt".format(img_id))
-        if int(img_id) < args.trainsize:
+        if int(img_id) == 7353:
             train_index, box_count = extract_frustum(path, img_id, train_index, point_train, perturb_box2d=True,
                                                      augmentX=2, demo=args.demo, no_label=args.nolabel)
             box3d_count = box3d_count + box_count
         else:
+            continue
             val_index, box_count = extract_frustum(path, img_id, val_index, point_val, perturb_box2d=False,
                                                    augmentX=1, demo=args.demo, no_label=args.nolabel)
             box3d_count = box3d_count + box_count
