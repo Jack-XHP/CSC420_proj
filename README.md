@@ -16,12 +16,14 @@ current scripts for part1:
 - get 2D box (yolov3):  download yolov3.weights from here https://pjreddie.com/media/files/yolov3.weights
 Put the weights file into part1yolo folder
 cd part1yolo
-pythonw detect.py --det det
+pythonw detect.py
+IF you want to draw the 2D box on images, add argument --draw-box, output will be in /det folder
 
 - get 2D box (ssd): download ssd weights (ssd300_mAP_77.43_v2.pth) from here https://s3.amazonaws.com/amdegroot-models/ssd300_mAP_77.43_v2.pth
 Put the weights file into part1ssd folder
 cd part1ssd
 pythonw detect.py
+IF you want to draw the 2D box on images, add argument --draw-box,  output will be in /det folder
 
 current scripts:
 ==========

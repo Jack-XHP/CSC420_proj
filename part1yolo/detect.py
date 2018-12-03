@@ -234,7 +234,7 @@ if __name__ ==  '__main__':
     draw = time.time()
 
     # x is output: [image_num, top_left_x, top_left_y, bottom_right_x, bottom_right_y, score?, socore?, class_num]
-    def write(x, batches, results, filenames):
+    def write(x, results, filenames):
         cls = int(x[-1])
         label = "{0}".format(classes[cls])
         # print(label)
@@ -276,12 +276,24 @@ if __name__ ==  '__main__':
     det_names = pd.Series(imlist).apply(lambda x: "{}/det_{}".format(args.det,x.split("/")[-1]))
     # print(det_names)
 
-
     if os.path.exists(out_box_dir):
         shutil.rmtree(out_box_dir)
     os.makedirs(out_box_dir)
 
-    list(map(lambda x: write(x, im_batches, orig_ims, det_names), output))
+    # print(output.shape)
+    # list(map(lambda x: write(x, orig_ims, det_names), output))
+
+    for detection in output:
+        write(detection, orig_ims, det_names)
+
+    for index in range(det_names.shape[0]):
+        image_name = det_names[index].split("/")[-1].split("_")[-1].split(".")[-2]
+        # print(image_name)
+        txt_path = out_box_dir + "/" + image_name + ".txt"
+        if not os.path.isfile(txt_path):
+            with open(txt_path, "w") as f:
+                f.write("")
+
 
     if args.draw_box:
         list(map(cv2.imwrite, det_names, orig_ims))
