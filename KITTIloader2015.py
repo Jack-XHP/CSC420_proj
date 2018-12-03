@@ -96,16 +96,16 @@ def read_2d_box(box_file):
     objects = []
     empty_list = "Car 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
     for line in open(box_file):
-        if line.strip():
+        if not line.strip():
             continue
-        data = line.split('')
+        data = line.split()
         new_obj = Object3d(empty_list)
         new_obj.type = 'Car'
-        new_obj.xmin = data[0]
-        new_obj.ymin = data[1]
-        new_obj.xmax = data[2]
-        new_obj.ymax = data[3]
-        new_obj.box2d = np.array(data)
+        new_obj.xmin = float(data[0])
+        new_obj.ymin = float(data[1])
+        new_obj.xmax = float(data[2])
+        new_obj.ymax = float(data[3])
+        new_obj.box2d = np.array([float(i) for i in data])
         objects.append(new_obj)
     return objects
 

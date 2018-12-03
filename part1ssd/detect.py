@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 module_path = os.path.abspath(os.path.join('.'))
 if module_path not in sys.path:
     sys.path.append(module_path)
@@ -38,8 +39,8 @@ def object_detect(img, out_box_dir, draw_box, out_img_dir):
 
 
     xx = Variable(x.unsqueeze(0))     # wrap tensor in Variable
-    # if torch.cuda.is_available():
-    #     xx = xx.cuda()
+    if torch.cuda.is_available():
+        xx = xx.cuda()
     y = net(xx)
 
 
@@ -118,10 +119,13 @@ def arg_parse():
     return parser.parse_args()
 
 if __name__ ==  '__main__':
-    args = arg_parse()
+    start = time.time()
 
+    args = arg_parse()
     net = build_ssd('test', 300, 21)    # initialize SSD
     net.load_weights(args.weightsfile)
+    if torch.cuda.is_available():
+        net = net.cuda()
 
     parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + "/"
     imageList = parent_folder + args.images
@@ -141,3 +145,6 @@ if __name__ ==  '__main__':
     TEST_IMAGE_PATHS = [imageList+img for img in os.listdir(imageList)]
     for img_path in TEST_IMAGE_PATHS:
         object_detect(img_path, out_box_dir, args.draw_box, out_img_dir)
+
+    end = time.time()
+    print("Average time_per_img: {:2.3f}".format( (end - start) / len(TEST_IMAGE_PATHS)))

@@ -9,6 +9,7 @@ import argparse
 from KITTIloader2015 import read_label, Object3d, read_2d_box, Calib
 from Plot_util import plot_all, plot_frsutum
 from Box_util import random_shift_box2d, compute_box_3d, extract_pc_in_box3d
+import shutil
 
 
 def find_3d_point(disp_path, calib):
@@ -40,7 +41,7 @@ def get_lidar_in_image_fov(pc_velo, calib, xmin, ymin, xmax, ymax,
         return imgfov_pc_velo
 
 
-def extract_frustum(path, img_id, index, point_dir, perturb_box2d=False, augmentX=1, demo=False, no_label=True):
+def extract_frustum(path, img_id, index, point_dir, perturb_box2d=False, augmentX=1, demo=False, no_label=False):
     '''
     Extract all 3D points within a 2D box frustum, both from stereo iamge and lidar. Rotate them from
     rectified coordinate to frustum coordinate. And use the ground truth 3D box to make a mask of points
@@ -73,7 +74,7 @@ def extract_frustum(path, img_id, index, point_dir, perturb_box2d=False, augment
         label_file = path + 'label_2/{}.txt'.format(img_id)
         objects = read_label(label_file)
     else:
-        box_2d = path + 'out_box/{}.txt'.format(img_id)
+        box_2d = path + 'box_ssd/{}.txt'.format(img_id)
         objects = read_2d_box(box_2d)
 
     box3d_count = []
@@ -105,6 +106,9 @@ def extract_frustum(path, img_id, index, point_dir, perturb_box2d=False, augment
 
             box_fov_inds = box_fov_inds & img_fov_inds
             velo_in_box_fov = velo_rect[box_fov_inds, :]
+
+            if box_fov_inds.sum() == 0:
+                continue
 
             # get UVDepth points within 2D box
             point_2d = points_raw[ymin: ymax + 1, xmin: xmax + 1]
@@ -140,27 +144,31 @@ def extract_frustum(path, img_id, index, point_dir, perturb_box2d=False, augment
             box3d_center = obj.t
             box3d_size = np.array([obj.l, obj.w, obj.h])
 
-            # find points within 3D box
-            _, inds = extract_pc_in_box3d(point_2d, box3d_corner)
-            label = np.zeros(point_2d.shape[0])
-            label[inds] = 1
+            if not no_label:
+                # find points within 3D box
+                _, inds = extract_pc_in_box3d(point_2d, box3d_corner)
+                label = np.zeros(point_2d.shape[0])
+                label[inds] = 1
 
-            # filter frustum with no points in 3D box
-            print("rgb points in box {}".format(label.sum()))
-            if label.sum() == 0:
-                print("skip")
-                continue
+                # filter frustum with no points in 3D box
+                print("rgb points in box {}".format(label.sum()))
+                if label.sum() == 0:
+                    print("skip")
+                    continue
 
-            # find points within 3D box
-            _, velo_inds = extract_pc_in_box3d(velo_in_box_fov, box3d_corner)
-            velo_label = np.zeros(velo_in_box_fov.shape[0])
-            velo_label[velo_inds] = 1
+                # find points within 3D box
+                _, velo_inds = extract_pc_in_box3d(velo_in_box_fov, box3d_corner)
+                velo_label = np.zeros(velo_in_box_fov.shape[0])
+                velo_label[velo_inds] = 1
 
-            # filter frustum with no points in 3D box
-            print("lidar points in box {}".format(velo_label.sum()))
-            if velo_label.sum() == 0:
-                print("skip")
-                continue
+                # filter frustum with no points in 3D box
+                print("lidar points in box {}".format(velo_label.sum()))
+                if velo_label.sum() == 0:
+                    print("skip")
+                    continue
+            else:
+                label = np.zeros(point_2d.shape[0])
+                velo_label = np.zeros(velo_in_box_fov.shape[0])
 
             if demo:
                 plot_frsutum(box3d_corner, point_2d, velo_in_box_fov)
@@ -202,6 +210,7 @@ if __name__ == '__main__':
 
     if args.nolabel:
         args.nolabel = True
+        args.trainsize = 0
 
     path = args.datapath
     dir = path + 'CNN_depth/'
@@ -220,6 +229,7 @@ if __name__ == '__main__':
     box3d_count = []
     for img in os.listdir(dir):
         img_id = img.split('.')[0]
+        shutil.copy(path + 'calib/0007.txt', path+"calib/{}.txt".format(img_id))
         if int(img_id) < args.trainsize:
             train_index, box_count = extract_frustum(path, img_id, train_index, point_train, perturb_box2d=True,
                                                      augmentX=2, demo=args.demo, no_label=args.nolabel)
@@ -228,4 +238,6 @@ if __name__ == '__main__':
             val_index, box_count = extract_frustum(path, img_id, val_index, point_val, perturb_box2d=False,
                                                    augmentX=1, demo=args.demo, no_label=args.nolabel)
             box3d_count = box3d_count + box_count
-    np.savetxt('avg_box_size', np.mean(np.array(box3d_count), axis=0))
+
+    if args.nolabel:
+        np.savetxt('avg_box_size', np.mean(np.array(box3d_count), axis=0))

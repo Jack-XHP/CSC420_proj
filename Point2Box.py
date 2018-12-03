@@ -477,9 +477,12 @@ def main():
 
 
 def demo():
-    demo_data = DA.myPointData(args.datapath + 'frustum_points_val/', 1048, 12, lidar=args.uselidar)
+    demo_data = DA.myPointData(args.datapath + 'frustum_points_test/', 1048, 12, lidar=args.uselidar)
     demo_load = torch.utils.data.DataLoader(demo_data, batch_size=100, shuffle=False, num_workers=8, drop_last=False)
-    save_dir = args.datapath + 'demo_result/'
+    if args.uselidar:
+        save_dir = args.datapath + 'demo_result_lidar/'
+    else:
+        save_dir = args.datapath + 'demo_result_disp/'
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     model.eval()
@@ -505,7 +508,6 @@ def demo():
 
             for i in range(batch_size):
                 data = np.concatenate((corners[i].cpu().numpy().flatten(), np.array([frustum_angle[i].cpu().numpy()])))
-                print(data)
                 np.save(save_dir + "{}_{}".format(img_id[i], id[i]), data)
 
 
