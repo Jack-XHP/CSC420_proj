@@ -99,9 +99,15 @@ def main(imgforlder, calibforder, box3dcornerforlder, savefolder):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='3D BOX projection')
-    parser.add_argument('--imgforlder', default="./obejct_data/data_object_image_2/training/image_2/")
-    parser.add_argument('--calibforder', default="./obejct_data/data_object_image_2/training/calib/")
-    parser.add_argument('--cornerforder', default="./obejct_data/data_object_image_2/training/demo_result/")
-    parser.add_argument('--savefolder', default="./obejct_data/data_object_image_2/training/result_image/")
+    parser.add_argument('--datapath', default="./obejct_data/data_object_image_2/training/")
+    # parser.add_argument('--imgforlder', default="./obejct_data/data_object_image_2/training/image_2/")
+    # parser.add_argument('--calibforder', default="./obejct_data/data_object_image_2/training/calib/")
+    # parser.add_argument('--cornerforder', default="./obejct_data/data_object_image_2/training/demo_result/")
+    # parser.add_argument('--savefolder', default="./obejct_data/data_object_image_2/training/result_image/")
     args = parser.parse_args()
-    main(args.imgforlder, args.calibforder, args.cornerforder, args.savefolder)
+    datapath = args.datapath
+    imgforlder = datapath + "image_2/"
+    calibforder = datapath + "calib/"
+    cornerforder = datapath + "corners/"
+    savefolder = datapath + "result_images/"
+    main(imgforlder, calibforder, cornerforder, savefolder)
