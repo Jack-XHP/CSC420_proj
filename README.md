@@ -34,7 +34,7 @@ Data folder structure
             - frsutum_points_test ( get from Compute_3D_point.py)
             - box_ssd (get from part1ssd)
             - box_yolo (get from part1yolo)
-            
+- Get Trained models for PSMnet and Point net from https://github.com/Jack-XHP/CSC420_proj/tree/master/trained_models
 
 current scripts for part1:
 ==========
