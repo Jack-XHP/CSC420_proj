@@ -11,26 +11,51 @@ Require packages:
 - opencv3.4.3
 - for detailed list of packages check requirement.txt
 
+Data folder structure
+========
+- To train PSMnet in CNN_disparity.py, download KITTI stereo 2015 task http://www.cvlibs.net/datasets/kitti/eval_scene_flow.php?benchmark=stereo
+    - form a data folder like this:
+       - depth_data:
+            - disp_occ_0
+            - image_2
+            - image_3
+
+- To train Point net in Point2Box.py, download KITTI 3D object detection task http://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark=3d
+    - form a data folder like this:
+        - object_data:
+            - image_2
+            - image_3
+            - calib
+            - label_2
+            - velodyne
+            - CNN_depth (get from CNN_disparity.py)
+            - frsutum_points_train ( get from Compute_3D_point.py)
+            - frsutum_points_val ( get from Compute_3D_point.py)
+            - frsutum_points_test ( get from Compute_3D_point.py)
+            - box_ssd (get from part1ssd)
+            - box_yolo (get from part1yolo)
+            
+
 current scripts for part1:
 ==========
 - get 2D box (yolov3):  download yolov3.weights from here https://pjreddie.com/media/files/yolov3.weights
 
-Put the weights file into part1yolo folder
-```
-cd part1yolo
-pythonw detect.py
-```
+    Put the weights file into part1yolo folder
+    ```
+    cd part1yolo
+    pythonw detect.py
+    ```
 
-IF you want to draw the 2D box on images, add argument `--draw-box`, output will be in /det folder
+    IF you want to draw the 2D box on images, add argument `--draw-box`, output will be in /det folder
 
 - get 2D box (ssd): download ssd weights (ssd300_mAP_77.43_v2.pth) from here https://s3.amazonaws.com/amdegroot-models/ssd300_mAP_77.43_v2.pth
 
-Put the weights file into part1ssd folder
-```
-cd part1ssd
-pythonw detect.py
-```
-IF you want to draw the 2D box on images, add argument `--draw-box`,  output will be in /det folder
+    Put the weights file into part1ssd folder
+    ```
+    cd part1ssd
+    pythonw detect.py
+    ```
+    IF you want to draw the 2D box on images, add argument `--draw-box`,  output will be in /det folder
 
 current scripts:
 ==========
@@ -44,14 +69,13 @@ current scripts:
         ```
     - get test set with CNN estimated 2D box: 
         ```
-        python Compute_3D_point.py --datapath [data folder] --nolabel Tru
-        e```
+        python Compute_3D_point.py --datapath [data folder] --nolabel True
+        ```
     - get plot of 3D points for each image and each frustum of 2D box: 
         ```
         python Compute_3D_point.py --datapath [data folder] --demo True
         ```
 - PSMnet source code : https://github.com/JiaRenChang/PSMNet/
-    - run command for PSMnet:
     - train model: 
         ```
         python CNN_disparity.py  --datapath [data folder]
