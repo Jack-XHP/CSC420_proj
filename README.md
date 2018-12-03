@@ -34,23 +34,58 @@ IF you want to draw the 2D box on images, add argument `--draw-box`,  output wil
 
 current scripts:
 ==========
-- get CNN disparity: python CNN_disparity.py --loadmodel [model] --datapath [data folder]
-- get Point Net prepared data: python Compute_3D_point.py --datapath [data folder] --demo [T/F] --trainsize [training set image range] --nolabel [T/F]
-    - get training and validation set with ground truth label: python Compute_3D_point.py --datapath [data folder] --trainsize [training set image range]
-    - get test set with CNN estimated 2D box: python Compute_3D_point.py --datapath [data folder] --nolabel True
-    - get plot of 3D points for each image and each frustum of 2D box: python Compute_3D_point.py --datapath [data folder] --demo True
-- Point nets: Point2Box.py [-h] --datapath [DATAPATH] --loadmodel [LOADMODEL] --uselidar [T/F]
-    - train Point net with disparity points: python Point2Box.py --datapath [data folder]
-    - train Point net with Lidar points: python Point2Box.py --datapath [data folder] --uselidar True
-    - get Point net estimate 3D box using disparity points: python Point2Box.py --datapath [data folder] --loadmodel [LOADMODEL]
-    - get Point net estimate 3D box using Lidar points: python Point2Box.py --datapath [data folder] --loadmodel [LOADMODEL] --uselidar True
-- Draw 3D box on left image: python corner2box.py --datapath [DATAPATH] --uselidar [T/F]
+- get Point Net prepared data:
+    ```
+    python Compute_3D_point.py --datapath [data folder] --demo [T/F] --trainsize [training set image range] --nolabel [T/F]
+    ```
+    - get training and validation set with ground truth label: 
+        ```
+        python Compute_3D_point.py --datapath [data folder] --trainsize [training set image range]
+        ```
+    - get test set with CNN estimated 2D box: 
+        ```
+        python Compute_3D_point.py --datapath [data folder] --nolabel Tru
+        e```
+    - get plot of 3D points for each image and each frustum of 2D box: 
+        ```
+        python Compute_3D_point.py --datapath [data folder] --demo True
+        ```
 - PSMnet source code : https://github.com/JiaRenChang/PSMNet/
     - run command for PSMnet:
-    - train model: python CNN_disparity
-    - get CNN disparity: python CNN_disparity --load_model <model path> --datapath <left and right image path>
-- Point Net source code : https://github.com/charlesq34/frustum-pointnets/blob/master/kitti/prepare_data.py
-- 3D Object proposal paper : https://arxiv.org/pdf/1608.07711.pdf
+    - train model: 
+        ```
+        python CNN_disparity.py  --datapath [data folder]
+        ```
+    - get CNN disparity:  
+        ```
+        python CNN_disparity.py --loadmodel [model] --datapath [data folder]
+        ```
+- Point Net source code : https://github.com/charlesq34/frustum-pointnets
+    - Point nets: 
+        ```
+        Point2Box.py [-h] --datapath [DATAPATH] --loadmodel [LOADMODEL] --uselidar [T/F]
+        ```
+    - train Point net with disparity points: 
+        ```
+        python Point2Box.py --datapath [data folder]
+        ```
+    - train Point net with Lidar points: 
+        ```
+        python Point2Box.py --datapath [data folder] --uselidar True
+        ```
+    - get Point net estimate 3D box using disparity points: 
+        ```
+        python Point2Box.py --datapath [data folder] --loadmodel [LOADMODEL]
+        ```
+    - get Point net estimate 3D box using Lidar points: 
+        ```
+        python Point2Box.py --datapath [data folder] --loadmodel [LOADMODEL] --uselidar True
+        ```
+    
+- Draw 3D box on left image: 
+    ```
+    python corner2box.py --datapath [DATAPATH] --uselidar [T/F]
+    ```
 - KITTI paper: http://www.cvlibs.net/publications/Geiger2013IJRR.pdf
 
 
@@ -102,7 +137,4 @@ calib_cam_to_cam.txt: Camera-to-camera calibration
   - P_rect_xx: 3x4 projection matrix after rectification
 
 calib data we use:
-  - f = 721.537700
-  - px = 609.559300
-  - py = 172.854000
-  - T = 0.5327119288
+  - T = 0.54
