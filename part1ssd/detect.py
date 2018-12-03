@@ -3,7 +3,7 @@ import sys
 module_path = os.path.abspath(os.path.join('.'))
 if module_path not in sys.path:
     sys.path.append(module_path)
-
+import argparse
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
@@ -17,10 +17,8 @@ from ssd import build_ssd
 from matplotlib import pyplot as plt
 from data import VOC_CLASSES as labels
 
-net = build_ssd('test', 300, 21)    # initialize SSD
-net.load_weights('ssd300_mAP_77.43_v2.pth')
 
-def object_detect(img):
+def object_detect(img, out_box_dir, draw_box, out_img_dir):
 
     image = cv2.imread(img, cv2.IMREAD_COLOR)
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -57,7 +55,7 @@ def object_detect(img):
     scale = torch.Tensor(rgb_image.shape[1::-1]).repeat(2)
     for i in range(detections.size(1)):
         j = 0
-        while detections[0,i,j,0] >= 0.2:
+        while detections[0,i,j,0] >= 0.1:
             score = detections[0,i,j,0]
             label_name = labels[i-1]
             display_txt = '%s: %.2f'%(label_name, score)
@@ -78,9 +76,13 @@ def object_detect(img):
             j+=1
 
     filename = img.split("/")[-1].split(".")[-2]
-    # cv2.imwrite('./det/{}_out.jpg'.format(filename), rgb_image)
 
-    out_path = os.path.join("./out_box", '{}.txt'.format(filename))
+    if draw_box:
+        # print(filename)
+        draw_path = out_img_dir + '/det_{}.jpg'.format(filename)
+        cv2.imwrite(draw_path, rgb_image)
+
+    out_path = out_box_dir + '/{}.txt'.format(filename)
     with open(out_path, 'w') as f:
         out = str(out_box)
         out = out.replace('[', "")
@@ -89,13 +91,53 @@ def object_detect(img):
     # plt.show()
     # plt.savefig('../det/{}_out.jpg'.format(img.split("/")[-1].split(".")[-2]))
 
+def arg_parse():
+    """
+    Parse arguements to the detect module
 
-out_box_dir = os.path.dirname(os.path.realpath(__file__)) + '/out_box'
-if not os.path.exists(out_box_dir):
-    os.makedirs(out_box_dir)
+    """
 
-imageList = '../obejct_data/data_object_image_2/training/image_2/'
-# imageList = './images/'
-TEST_IMAGE_PATHS = [imageList+img for img in os.listdir(imageList)]
-for img_path in TEST_IMAGE_PATHS:
-    object_detect(img_path)
+
+    parser = argparse.ArgumentParser(description='YOLO v3 Detection Module')
+    parser.add_mutually_exclusive_group(required=False)
+
+    parser.add_argument('--datapath', dest = 'datapath', default='obejct_data/data_object_image_2/training/', help='datapath')
+    parser.add_argument("--images", dest = 'images', help =
+                        "Image / Directory containing images to perform detection upon",
+                        default = 'obejct_data/data_object_image_2/training/image_2/', type = str)
+    parser.add_argument("--det", dest = 'det', help =
+                        "Image / Directory to store detections to",
+                        default = "det", type = str)
+    parser.add_argument('--draw-box', dest = 'draw_box', action='store_true')
+    parser.add_argument('--no-draw-box', dest = 'draw_box', action='store_false')
+    parser.set_defaults(draw_box=False)
+    parser.add_argument("--weights", dest = 'weightsfile', help =
+                        "weightsfile",
+                        default = "ssd300_mAP_77.43_v2.pth", type = str)
+
+    return parser.parse_args()
+
+if __name__ ==  '__main__':
+    args = arg_parse()
+
+    net = build_ssd('test', 300, 21)    # initialize SSD
+    net.load_weights(args.weightsfile)
+
+    parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + "/"
+    imageList = parent_folder + args.images
+    # print(imageList)
+    out_box_dir = parent_folder + args.datapath + 'box_ssd'
+
+    # out_box_dir = os.path.dirname(os.path.realpath(__file__)) + '/out_box'
+    if not os.path.exists(out_box_dir):
+        os.makedirs(out_box_dir)
+
+    out_img_dir = os.path.dirname(os.path.realpath(__file__))+'/'+ args.det
+    if not os.path.exists(out_img_dir):
+        os.makedirs(out_img_dir)
+
+    # imageList = '../obejct_data/data_object_image_2/training/image_2/'
+    # imageList = './images/'
+    TEST_IMAGE_PATHS = [imageList+img for img in os.listdir(imageList)]
+    for img_path in TEST_IMAGE_PATHS:
+        object_detect(img_path, out_box_dir, args.draw_box, out_img_dir)
