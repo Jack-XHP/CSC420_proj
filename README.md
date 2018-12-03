@@ -26,13 +26,16 @@ pythonw detect.py
 current scripts:
 ==========
 - get CNN disparity: python CNN_disparity.py --loadmodel [model] --datapath [data folder]
-- get FRCNN 2d boxes: python Get_2D_Box.py
-- get Point Net prepared data: python Compute_3D_point.py --datapath [data folder]
-- get Frsutum points plot: python Compute_3D_point.py --datapath [data folder] --demo True
-- train Point net with disparity points: python Point2Box.py --datapath [data folder]
-- train Point net with Lidar points: python Point2Box.py --datapath [data folder] --uselidar True
-- get Point net result: python Point2Box.py --datapath [data folder] --uselidar [T/F] --loadmodel [model]
-- HHA source code : https://github.com/ZhangMenghe/rgbd-processor-python
+- get Point Net prepared data: python Compute_3D_point.py --datapath [data folder] --demo [T/F] --trainsize [training set image range] --nolabel [T/F]
+    - get training and validation set with ground truth label: python Compute_3D_point.py --datapath [data folder] --trainsize [training set image range]
+    - get test set with CNN estimated 2D box: python Compute_3D_point.py --datapath [data folder] --nolabel True
+    - get plot of 3D points for each image and each frustum of 2D box: python Compute_3D_point.py --datapath [data folder] --demo True
+- Point nets: Point2Box.py [-h] --datapath [DATAPATH] --loadmodel [LOADMODEL] --uselidar [T/F]
+    - train Point net with disparity points: python Point2Box.py --datapath [data folder]
+    - train Point net with Lidar points: python Point2Box.py --datapath [data folder] --uselidar True
+    - get Point net estimate 3D box using disparity points: python Point2Box.py --datapath [data folder] --loadmodel [LOADMODEL]
+    - get Point net estimate 3D box using Lidar points: python Point2Box.py --datapath [data folder] --loadmodel [LOADMODEL] --uselidar True
+- Draw 3D box on left image: python corner2box.py --datapath [DATAPATH] --uselidar [T/F]
 - PSMnet source code : https://github.com/JiaRenChang/PSMNet/
     - run command for PSMnet:
     - train model: python CNN_disparity

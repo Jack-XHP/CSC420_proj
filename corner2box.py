@@ -100,6 +100,7 @@ def main(imgforlder, calibforder, box3dcornerforlder, savefolder):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='3D BOX projection')
     parser.add_argument('--datapath', default="./obejct_data/data_object_image_2/training/")
+    parser.add_argument('--uselidar', default=False)
     # parser.add_argument('--imgforlder', default="./obejct_data/data_object_image_2/training/image_2/")
     # parser.add_argument('--calibforder', default="./obejct_data/data_object_image_2/training/calib/")
     # parser.add_argument('--cornerforder', default="./obejct_data/data_object_image_2/training/demo_result/")
@@ -108,6 +109,10 @@ if __name__ == '__main__':
     datapath = args.datapath
     imgforlder = datapath + "image_2/"
     calibforder = datapath + "calib/"
-    cornerforder = datapath + "corners/"
-    savefolder = datapath + "result_images/"
+    if args.uselidar:
+        cornerforder = datapath + "corners_lidar/"
+        savefolder = datapath + "result_images_lidar/"
+    else:
+        cornerforder = datapath + "corners_disp/"
+        savefolder = datapath + "result_images_disp/"
     main(imgforlder, calibforder, cornerforder, savefolder)

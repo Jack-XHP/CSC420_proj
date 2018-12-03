@@ -480,9 +480,9 @@ def demo():
     demo_data = DA.myPointData(args.datapath + 'frustum_points_test/', 1048, 12, lidar=args.uselidar)
     demo_load = torch.utils.data.DataLoader(demo_data, batch_size=100, shuffle=False, num_workers=8, drop_last=False)
     if args.uselidar:
-        save_dir = args.datapath + 'demo_result_lidar/'
+        save_dir = args.datapath + 'corners_lidar/'
     else:
-        save_dir = args.datapath + 'demo_result_disp/'
+        save_dir = args.datapath + 'corners_disp/'
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     model.eval()
