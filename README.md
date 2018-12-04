@@ -47,6 +47,7 @@ current scripts for part1:
     ```
 
     IF you want to draw the 2D box on images, add argument `--draw-box`, output will be in /det folder
+    Thanks for the tutorial and code from https://blog.paperspace.com/how-to-implement-a-yolo-object-detector-in-pytorch/
 
 - get 2D box (ssd): download ssd weights (ssd300_mAP_77.43_v2.pth) from here https://s3.amazonaws.com/amdegroot-models/ssd300_mAP_77.43_v2.pth
 
@@ -56,6 +57,7 @@ current scripts for part1:
     pythonw detect.py
     ```
     IF you want to draw the 2D box on images, add argument `--draw-box`,  output will be in /det folder
+    Thanks for code reference from https://github.com/amdegroot/ssd.pytorch
 
 current scripts:
 ==========
