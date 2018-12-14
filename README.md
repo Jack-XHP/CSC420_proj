@@ -1,5 +1,9 @@
 # CSC420_proj
 
+Demo 
+===========
+https://www.youtube.com/watch?v=_IV4fe07ECo&t=121s
+
 Require packages:
 ===========
 - python 2.7
